@@ -52,7 +52,7 @@ TBlendType    currentBlending;
 extern CRGBPalette16 myRedWhiteBluePalette;
 extern const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM;
 
-char dmxData[DMX_BYTES_COUNT]{0};
+char dmxData[DMX_BYTES_COUNT-1]{0};
 
 ResponsiveAnalogRead brightnessAnalog(ANALOG_PIN, true);
 int brightnessValue = MIN_BRIGHTNESS;
@@ -80,7 +80,7 @@ void loop()
     brightnessAnalog.update();  // update the brightness based on the potentiometer value
     int anVal = brightnessAnalog.getValue();
     if (anVal > DEADZONE_WIDTH && anVal < 1023 - DEADZONE_WIDTH) {
-        brightnessValue = map(anVal, 0, 1023, MIN_BRIGHTNESS, MAX_BRIGHTNESS);
+        brightnessValue = map(anVal, DEADZONE_WIDTH, 1023 - DEADZONE_WIDTH, MIN_BRIGHTNESS, MAX_BRIGHTNESS);
         FastLED.setBrightness(brightnessValue);
     }
     
@@ -101,8 +101,15 @@ void ReadDMX(){
     Wire1.requestFrom(SLAVE_ADDRESS, DMX_BYTES_COUNT);   // request DMX data from slave device
     int availableCount = Wire1.available();              // if ready read the data from the slave
     if (availableCount >= DMX_BYTES_COUNT) {
-        for (int i = 0; i < DMX_BYTES_COUNT; i++) {
-            dmxData[i] = Wire1.read();
+        if (Wire1.read() == 255) {                       // new DMX data is being sent
+            for (int i = 0; i < DMX_BYTES_COUNT-1; i++) {
+                dmxData[i] = Wire1.read();
+            }
+//            Serial.printf("Data: %d %d %d %d %d %d %d brightness: %d\n", dmxData[0], dmxData[1], dmxData[2], dmxData[3], dmxData[4], dmxData[5], dmxData[6], brightnessValue);
+        } else {                                         // no new data - flush buffer
+            while(Wire1.available()) {
+                Wire1.read();
+            }
         }
     }
 }
