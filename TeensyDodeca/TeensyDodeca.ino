@@ -21,31 +21,17 @@
 #define UPDATES_PER_SECOND 100
 
 #define SLAVE_ADDRESS   0x01
-#define DMX_BYTES_COUNT 8
+#define DMX_BYTES_COUNT 22 //3 sections: 7 channels each: 4 for control + 3 for color and first byte marking changes 
+#define DMX_UPDATES_PER_SECOND 60
 
 #define MIN_BRIGHTNESS 10
 #define MAX_BRIGHTNESS 150
 #define DEADZONE_WIDTH 25
 #define ANALOG_PIN     23 //A9
 
-// This example shows several ways to set up and use 'palettes' of colors
-// with FastLED.
-//
-// These compact palettes provide an easy way to re-colorize your
-// animation on the fly, quickly, easily, and with low overhead.
-//
-// USING palettes is MUCH simpler in practice than in theory, so first just
-// run this sketch, and watch the pretty lights as you then read through
-// the code.  Although this sketch has eight (or more) different color schemes,
-// the entire sketch compiles down to about 6.5K on AVR.
-//
-// FastLED provides a few pre-configured color palettes, and makes it
-// extremely easy to make up your own color schemes with palettes.
-//
-// Some notes on the more abstract 'theory and practice' of
-// FastLED compact palettes are at the bottom of this file.
 
-CRGB leds[NUM_LEDS];
+CRGBArray<NUM_LEDS> leds;
+
 CRGBPalette16 currentPalette;
 TBlendType    currentBlending;
 
@@ -77,24 +63,36 @@ void setup() {
 
 void loop()
 {
+
+    EVERY_N_MILLISECONDS(1000 / DMX_UPDATES_PER_SECOND){
+        ReadDMX();
+        SetBrightness();
+    }
+
+    EVERY_N_MILLISECONDS(1000 / UPDATES_PER_SECOND) {
+//        unsigned long time = millis();
+
+        ChangePalettePeriodically();
+        
+        static uint8_t startIndex = 0;
+        startIndex = startIndex + 1; /* motion speed */
+        
+        FillLEDsFromPaletteColors(startIndex);
+
+//        Serial.println(millis() - time);
+    }
+    
+    FastLED.show();
+//    FastLED.delay(1000 / UPDATES_PER_SECOND);
+}
+
+void SetBrightness(){ 
     brightnessAnalog.update();  // update the brightness based on the potentiometer value
     int anVal = brightnessAnalog.getValue();
     if (anVal > DEADZONE_WIDTH && anVal < 1023 - DEADZONE_WIDTH) {
         brightnessValue = map(anVal, DEADZONE_WIDTH, 1023 - DEADZONE_WIDTH, MIN_BRIGHTNESS, MAX_BRIGHTNESS);
         FastLED.setBrightness(brightnessValue);
     }
-    
-    ReadDMX();
-    
-    ChangePalettePeriodically();
-    
-    static uint8_t startIndex = 0;
-    startIndex = startIndex + 1; /* motion speed */
-    
-    FillLEDsFromPaletteColors(startIndex);
-    
-    FastLED.show();
-    FastLED.delay(1000 / UPDATES_PER_SECOND);
 }
 
 void ReadDMX(){
@@ -105,7 +103,6 @@ void ReadDMX(){
             for (int i = 0; i < DMX_BYTES_COUNT-1; i++) {
                 dmxData[i] = Wire1.read();
             }
-//            Serial.printf("Data: %d %d %d %d %d %d %d brightness: %d\n", dmxData[0], dmxData[1], dmxData[2], dmxData[3], dmxData[4], dmxData[5], dmxData[6], brightnessValue);
         } else {                                         // no new data - flush buffer
             while(Wire1.available()) {
                 Wire1.read();
