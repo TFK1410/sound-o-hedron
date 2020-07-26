@@ -38,9 +38,6 @@ CRGBArray<NUM_LEDS> leds;
 CRGBPalette16 currentPalette;
 TBlendType    currentBlending;
 
-extern CRGBPalette16 myRedWhiteBluePalette;
-extern const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM;
-
 char dmxData[DMX_BYTES_COUNT-1]{0};
 
 ResponsiveAnalogRead brightnessAnalog(ANALOG_PIN, true);
@@ -75,7 +72,8 @@ void loop()
     EVERY_N_MILLISECONDS(1000 / UPDATES_PER_SECOND) {
 //        unsigned long time = millis();
 
-        process();
+//        Blackout();
+        flash(172, 0, 128, map(brightnessAnalog.getValue(), 0, 1023, 0, 255), CRGB::BlueViolet);
 
 //        Serial.println(millis() - time);
     }

@@ -1,38 +1,15 @@
-void process() {
+
+extern CRGBPalette16 myRedWhiteBluePalette;
+extern const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM;
+
+
+void demo() {
     ChangePalettePeriodically();
 
     static uint8_t startIndex = 0;
     startIndex = startIndex + 1;
-    static uint8_t faceIndex = 0;
-    if (startIndex % 100 == 0) {
-        faceIndex += 1;
-        if (faceIndex == 12) {
-            faceIndex = 0;
-        }
-    }
 
-    FillLEDFaceFromPaletteColors(startIndex, faces[faceIndex]);
-}
-
-
-void FillLEDFaceFromPaletteColors( uint8_t colorIndex, uint8_t edges[])
-{
-    uint8_t brightness = 255;
-    Blackout();
-
-    for (byte k=0; edges[k] < 255; k++) {
-        for (int i = EDGE_LENGTH * edges[k]; i < EDGE_LENGTH * (edges[k] + 1); i++) {
-//            leds[i] = CRGB::White;
-            leds[i] = ColorFromPalette( currentPalette, colorIndex, brightness, currentBlending);
-            colorIndex += 3;
-        }
-    }
-}
-
-void Blackout() {
-    for( int i = 0; i < NUM_LEDS; i++) {
-        leds[i] = CRGB::Black;
-    }
+    FillLEDsFromPaletteColors(startIndex);
 }
 
 void FillLEDsFromPaletteColors( uint8_t colorIndex)
