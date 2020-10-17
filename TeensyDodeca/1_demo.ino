@@ -2,7 +2,6 @@
 extern CRGBPalette16 myRedWhiteBluePalette;
 extern const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM;
 
-
 void demo() {
     ChangePalettePeriodically();
 

@@ -30,8 +30,14 @@
 #define DEADZONE_WIDTH 25
 #define ANALOG_PIN     23 //A9
 
+#define MODE_PIN       22 //A8
+#define MODE_COUNT     5
+#define OFF_MODE       0
+#define DEMO_MODE      1
+#define DMX_MODE       2
+int currentMode = 0;
 
-
+//#define TIME_DEBUG
 
 CRGBArray<NUM_LEDS> leds;
 
@@ -49,6 +55,8 @@ void setup() {
     
     Wire1.begin();                         // join i2c bus
     Serial.begin(9600);                    // start serial for output
+
+    init_group_list();                     // init edge lists
   
     delay(3000); // power-up safety delay
     FastLED.addLeds<NUM_STRIPS, LED_TYPE, LED_MASTER_PIN, COLOR_ORDER>(leds, NUM_LEDS_PER_STRIP).setCorrection(TypicalLEDStrip);
@@ -66,20 +74,49 @@ void loop()
 
     EVERY_N_MILLISECONDS(1000 / DMX_UPDATES_PER_SECOND){
         ReadDMX();
-        SetBrightness();
     }
 
     EVERY_N_MILLISECONDS(1000 / UPDATES_PER_SECOND) {
-//        unsigned long time = millis();
-
-//        Blackout();
-        flash(172, 0, 128, map(brightnessAnalog.getValue(), 0, 1023, 0, 255), CRGB::BlueViolet);
-
-//        Serial.println(millis() - time);
+      
+#ifdef TIME_DEBUG
+        unsigned long time = millis();
+#endif
+        
+        SetBrightness();
+        ReadMode();
+        
+        switch (currentMode) {
+          case OFF_MODE:
+            Blackout();
+            break;
+          case DEMO_MODE:
+            demo();
+            break;
+          case DMX_MODE:
+            Blackout();
+            brightnessAnalog.update();
+//            flash(0xF0 | map(brightnessAnalog.getValue(), 0, 1023, 0, 0xF), 128, 128, 200, RainbowColors_p);
+            flash(0x92, 128, 128, map(brightnessAnalog.getValue(), 0, 1023, 0, 0xFF), RainbowColors_p);
+            break;
+          case 3:
+            MarkEdges();
+            break;
+          default:
+            Blackout();
+            break;    
+        }
+        
+        FastLED.show();
+        
+#ifdef TIME_DEBUG
+        Serial.println(millis() - time);
+#endif
     }
-    
-    FastLED.show();
-//    FastLED.delay(1000 / UPDATES_PER_SECOND);
+
+}
+
+void ReadMode(){
+    currentMode = map(analogRead(MODE_PIN), 0, 1150, 0, MODE_COUNT-1);
 }
 
 void SetBrightness(){ 
