@@ -38,6 +38,10 @@
 int currentMode = 0;
 
 //#define TIME_DEBUG
+#define DMX_DEBUG
+#ifdef DMX_DEBUG
+uint8_t dmx_params[5];
+#endif
 
 CRGBArray<NUM_LEDS> leds;
 
@@ -81,10 +85,19 @@ void loop()
 #ifdef TIME_DEBUG
         unsigned long time = millis();
 #endif
-        
+
         SetBrightness();
         ReadMode();
+
+#ifdef DMX_DEBUG
+
+        dmx_params[currentMode] = map(brightnessAnalog.getValue(), 0, 1023, 0, 255);
         
+        Blackout();
+//        flash(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], 128, dmx_params[2], RainbowColors_p);
+        impulse(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
+        
+#else
         switch (currentMode) {
           case OFF_MODE:
             Blackout();
@@ -105,6 +118,7 @@ void loop()
             Blackout();
             break;    
         }
+#endif
         
         FastLED.show();
         

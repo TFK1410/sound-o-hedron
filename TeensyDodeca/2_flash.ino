@@ -56,30 +56,8 @@ void flash(uint8_t edges, uint8_t edgePattern, uint8_t blackout, uint8_t value, 
     }
 
 //    uint8_t edge_list_num = map(edges, 0, 255, 0, COMBINED_GROUP_COUNT - 1);
-    uint8_t edge_list_num[] = {255, 255, 255, 255, 255};
-    if (edges == 0xFF) {
-        edge_list_num[0] = 0;
-        edge_list_num[1] = FACES_COUNT;
-        edge_list_num[2] = 2*FACES_COUNT;
-        edge_list_num[3] = FACES_COUNT / 2;
-        edge_list_num[4] = FACES_COUNT * 3 / 2;
-    } else {
-        uint8_t main_face = edges & 0x0F;
-        if (main_face > 0 && main_face <= FACES_COUNT){
-            if(edges & 0x80) { // is the face itself selected
-                edge_list_num[0] = main_face - 1;
-            }
-            if(edges & 0x40) { // are the sparks of the face selected
-                edge_list_num[1] = main_face - 1 + FACES_COUNT;
-            }
-            if(edges & 0x20) { // is the ring of the face selected
-                edge_list_num[2] = main_face - 1 + 2*FACES_COUNT;
-            }
-            if(edges & 0x10) { // is the opposite face selected
-                edge_list_num[3] = (main_face - 1 + FACES_COUNT * 3 / 2) % (FACES_COUNT);
-            }
-        }
-    }
+    uint8_t edge_list_num[5];
+    get_edge_list_nums_from_dmx_byte(edges, &edge_list_num[0]);
 
     for (int edge_list_index = 0; edge_list_index < 5; edge_list_index++) {
         if (edge_list_num[edge_list_index] < 255) {
