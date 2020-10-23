@@ -55,31 +55,7 @@ void flash(uint8_t edges, uint8_t edgePattern, uint8_t blackout, uint8_t value, 
         }
     }
 
-//    uint8_t edge_list_num = map(edges, 0, 255, 0, COMBINED_GROUP_COUNT - 1);
-    uint8_t edge_list_num[5];
-    get_edge_list_nums_from_dmx_byte(edges, &edge_list_num[0]);
-
-    for (int edge_list_index = 0; edge_list_index < 5; edge_list_index++) {
-        if (edge_list_num[edge_list_index] < 255) {
-            for (int8_t *edge = comboEdgeGroups[edge_list_num[edge_list_index]]; *edge != 0; edge++) {
-                
-                int led_num_start = 0;
-                
-                int8_t edge_num = *edge;
-                if (edge_num > 0) {
-                    led_num_start = EDGE_LENGTH * (edge_num - 1);
-                    leds(led_num_start, led_num_start + EDGE_LENGTH - 1) = current_flash_edge;
-                } else if (edge_num < 0) {
-                    led_num_start = EDGE_LENGTH * (0 - edge_num - 1);
-                    int j = 0;
-                    for (int i = led_num_start + EDGE_LENGTH - 1; i >= led_num_start; i--) {
-                        leds[i] = current_flash_edge[j];
-                        j++;
-                    }
-                }
-            }
-        }
-    }
+    replicate_edge(edges, current_flash_edge);
 }
 
 

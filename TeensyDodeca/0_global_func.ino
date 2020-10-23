@@ -43,3 +43,31 @@ void get_edge_list_nums_from_dmx_byte(uint8_t edge_byte, uint8_t *edge_list_num)
         }
     }
 }
+
+// Copies over single edge template over every other edge based on the template
+void replicate_edge(uint8_t edgeByte, CRGBArray<EDGE_LENGTH> edge_template){
+    uint8_t edge_list_num[5];
+    get_edge_list_nums_from_dmx_byte(edgeByte, &edge_list_num[0]);
+    
+    for (int edge_list_index = 0; edge_list_index < 5; edge_list_index++) {
+        if (edge_list_num[edge_list_index] < 255) {
+            for (int8_t *edge = comboEdgeGroups[edge_list_num[edge_list_index]]; *edge != 0; edge++) {
+                
+                int led_num_start = 0;
+                
+                int8_t edge_num = *edge;
+                if (edge_num > 0) {
+                    led_num_start = EDGE_LENGTH * (edge_num - 1);
+                    leds(led_num_start, led_num_start + EDGE_LENGTH - 1) = edge_template;
+                } else if (edge_num < 0) {
+                    led_num_start = EDGE_LENGTH * (0 - edge_num - 1);
+                    int j = 0;
+                    for (int i = led_num_start + EDGE_LENGTH - 1; i >= led_num_start; i--) {
+                        leds[i] = edge_template[j];
+                        j++;
+                    }
+                }
+            }
+        }
+    }
+}

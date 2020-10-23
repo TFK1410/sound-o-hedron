@@ -51,7 +51,7 @@ TBlendType    currentBlending;
 char dmxData[DMX_BYTES_COUNT-1]{0};
 
 ResponsiveAnalogRead brightnessAnalog(ANALOG_PIN, true);
-int brightnessValue = MIN_BRIGHTNESS;
+int brightnessValue = (MIN_BRIGHTNESS + MAX_BRIGHTNESS) / 2;
 
 void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
@@ -86,18 +86,20 @@ void loop()
         unsigned long time = millis();
 #endif
 
-        SetBrightness();
         ReadMode();
 
 #ifdef DMX_DEBUG
 
+        brightnessAnalog.update();
         dmx_params[currentMode] = map(brightnessAnalog.getValue(), 0, 1023, 0, 255);
         
         Blackout();
 //        flash(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], 128, dmx_params[2], RainbowColors_p);
-        impulse(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
+//        impulse(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
+        strobe(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
         
 #else
+        SetBrightness();
         switch (currentMode) {
           case OFF_MODE:
             Blackout();
