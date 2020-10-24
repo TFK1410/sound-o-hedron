@@ -22,7 +22,7 @@
 #define UPDATES_PER_SECOND 100
 
 #define SLAVE_ADDRESS   0x01
-#define DMX_BYTES_COUNT 22 //3 sections: 7 channels each: 4 for control + 3 for color and first byte marking changes 
+#define DMX_BYTES_COUNT 25 //first byte marking changes + 3 sections (first 3 bytes selecting modes): 7 channels each: 4 for control + 3 for color
 #define DMX_UPDATES_PER_SECOND 60
 
 #define MIN_BRIGHTNESS 10
@@ -96,7 +96,8 @@ void loop()
         Blackout();
 //        flash(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], 128, dmx_params[2], RainbowColors_p);
 //        impulse(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
-        strobe(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
+//        strobe(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
+        march(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
         
 #else
         SetBrightness();
