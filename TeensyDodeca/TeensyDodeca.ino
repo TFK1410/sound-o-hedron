@@ -97,7 +97,8 @@ void loop()
 //        flash(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], 128, dmx_params[2], RainbowColors_p);
 //        impulse(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
 //        strobe(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
-        march(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
+//        march(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
+        dodecaBlink(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
         
 #else
         SetBrightness();
