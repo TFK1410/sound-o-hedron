@@ -1,28 +1,28 @@
 #define MAX_BLINKS 60
-#define MAX_BLINK_FADE_SPEED 80
+#define BLINK_INITS_ITER_DELAY 10
 
 struct BlinkPosition {
     int16_t pos;
     int16_t bri;
 };
 
-bool blinkInit = false;
+bool blinkInit = 1;
 
 unsigned long tickBlinkLast;
-unsigned long tickBlinkPassed;
+uint8_t initBlinkIter = 0;
 
 BlinkPosition blinks[MAX_BLINKS];
 
 void dodecaBlink(uint8_t edges, uint8_t numOfBlinks, uint8_t value, CRGBPalette16 palette) {
-    if (blinkInit == false) {
-        for (int i = 0; i < MAX_BLINKS; i++) { blinks[i] = (BlinkPosition) {-1, random8(255)}; }
-        blinkInit = true;
+    if (!blinkInit) {
+        for (int i = 0; i < MAX_BLINKS; i++) { blinks[i] = (BlinkPosition) {-1, 0}; }
+        blinkInit = 0;
         tickBlinkLast = millis();
         return;
     }
 
     // this is expressed in milliseconds per 1 value in the brightness map
-    unsigned long tickBlinkBrightness = map(logscale8[255-value], 0, 255, 2, 100);
+    float tickBlinkBrightness = map(logscale8[255-value], 0, 255, 10, 50) / 10.0;
 
     uint8_t ticksBlink = (millis() - tickBlinkLast) / tickBlinkBrightness;
     if (ticksBlink > 0) { tickBlinkLast = millis(); }
@@ -33,18 +33,19 @@ void dodecaBlink(uint8_t edges, uint8_t numOfBlinks, uint8_t value, CRGBPalette1
     uint8_t selectedBlinks = map(numOfBlinks, 0, 255, 0, MAX_BLINKS);
     if (edgeCount > 0) {
         for (int i = 0; i < selectedBlinks; i++) {
-            if (blinks[i].bri < 1) {
+            if (blinks[i].bri < 1 && initBlinkIter == 0) {
                 blinks[i].pos = EDGE_LENGTH * (abs(edge_list[random8(edgeCount)]) - 1) + random8(EDGE_LENGTH);
                 blinks[i].bri = 255 - random8(20);
-    //            Serial.println(blinks[i].bri);
+                initBlinkIter = BLINK_INITS_ITER_DELAY + 1;
             } 
-            if (blinks[i].pos > 0 && blinks[i].bri > 0) {
+            if (blinks[i].pos >= 0 && blinks[i].bri > 0) {
                 leds[blinks[i].pos] = ColorFromPalette(palette, 255 / selectedBlinks * i, logscale8[blinks[i].bri], LINEARBLEND);
             }
     
             blinks[i].bri -= ticksBlink;
             // 25% chance for noise
             blinks[i].bri -= random8(4)/3;
+            if (initBlinkIter > 0) { initBlinkIter--; }
         }
     }
 
