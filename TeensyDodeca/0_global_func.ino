@@ -17,14 +17,18 @@ void MarkEdges() {
     }
 }
 
+void get_all_edges_from_face(uint8_t front_face, uint8_t *face_list_num) {
+    face_list_num[0] = front_face;
+    face_list_num[1] = FACES_COUNT + front_face;
+    face_list_num[2] = 2*FACES_COUNT + front_face;
+    face_list_num[3] = FACES_COUNT + (FACES_COUNT / 2 + front_face) % FACES_COUNT;
+    face_list_num[4] = (FACES_COUNT / 2 + front_face) % FACES_COUNT;
+}
+
 void get_face_list_nums_from_dmx_byte(uint8_t edge_byte, uint8_t *face_list_num) {
     for (int i = 0; i < 5; i++) { face_list_num[i] = 255; }
     if (edge_byte == 0xFF) {
-        face_list_num[0] = 0;
-        face_list_num[1] = FACES_COUNT;
-        face_list_num[2] = 2*FACES_COUNT;
-        face_list_num[3] = FACES_COUNT / 2;
-        face_list_num[4] = FACES_COUNT * 3 / 2;
+        get_all_edges_from_face(0, face_list_num);
     } else {
         uint8_t main_face = edge_byte & 0x0F;
         if (main_face > 0 && main_face <= FACES_COUNT){
@@ -58,7 +62,11 @@ void replicate_edge(uint8_t edgeByte, CRGBArray<EDGE_LENGTH> edge_template){
                 int8_t edge_num = *edge;
                 if (edge_num > 0) {
                     led_num_start = EDGE_LENGTH * (edge_num - 1);
-                    leds(led_num_start, led_num_start + EDGE_LENGTH - 1) = edge_template;
+                    int j = 0;
+                    for (int i = led_num_start; i < led_num_start + EDGE_LENGTH; i++) {
+                        leds[i] = edge_template[j];
+                        j++;
+                    }
                 } else if (edge_num < 0) {
                     led_num_start = EDGE_LENGTH * (0 - edge_num - 1);
                     int j = 0;
@@ -88,4 +96,33 @@ uint8_t get_edge_list(uint8_t edgeByte, int8_t *edge_list) {
         }
     }
     return i;
+}
+
+
+
+// Blend one CRGB color toward another CRGB color by a given amount.
+// Blending is linear, and done in the RGB color space.
+// This function modifies 'cur' in place.
+CRGB fadeTowardColor( CRGB& cur, const CRGB& target, uint8_t amount)
+{
+  nblendU8TowardU8( cur.red,   target.red,   amount);
+  nblendU8TowardU8( cur.green, target.green, amount);
+  nblendU8TowardU8( cur.blue,  target.blue,  amount);
+  return cur;
+}
+
+// Helper function that blends one uint8_t toward another by a given amount
+void nblendU8TowardU8( uint8_t& cur, const uint8_t target, uint8_t amount)
+{
+  if( cur == target) return;
+ 
+  if( cur < target ) {
+    uint8_t delta = target - cur;
+    delta = scale8_video( delta, amount);
+    cur += delta;
+  } else {
+    uint8_t delta = cur - target;
+    delta = scale8_video( delta, amount);
+    cur -= delta;
+  }
 }

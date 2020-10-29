@@ -94,13 +94,14 @@ void loop()
         dmx_params[currentMode] = map(brightnessAnalog.getValue(), 0, 1023, 0, 255);
         
         Blackout();
-//        flash(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], 128, dmx_params[2], RainbowColors_p);
+//        flash(0xC0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
 //        impulse(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
 //        strobe(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
 //        march(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
 //        dodecaBlink(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
 //        dodecaRipple(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
-        dodecaGhosting(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
+//        dodecaGhosting(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
+        dodecaFill(dmx_params[0], dmx_params[1], dmx_params[2], RainbowColors_p);
         
 #else
         SetBrightness();
@@ -114,8 +115,8 @@ void loop()
           case DMX_MODE:
             Blackout();
             brightnessAnalog.update();
-//            flash(0xF0 | map(brightnessAnalog.getValue(), 0, 1023, 0, 0xF), 128, 128, 200, RainbowColors_p);
-            flash(0x92, 128, 128, map(brightnessAnalog.getValue(), 0, 1023, 0, 0xFF), RainbowColors_p);
+//            flash(0xF0 | map(brightnessAnalog.getValue(), 0, 1023, 0, 0xF), 128, 200, RainbowColors_p);
+            flash(0x92, 128, map(brightnessAnalog.getValue(), 0, 1023, 0, 0xFF), RainbowColors_p);
             break;
           case 3:
             MarkEdges();
