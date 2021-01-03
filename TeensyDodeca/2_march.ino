@@ -13,6 +13,7 @@ void march(uint8_t edges, uint8_t segmentNum, uint8_t marchSpeed, CRGBPalette16 
     for (int i = 0; i < 256; i++) {
         if (quadwave8(i) > MARCH_BR_THRESH) {
             paletteMargin = triwave8(i);
+            break;
         }
     }
     uint8_t paletteValue = 0;

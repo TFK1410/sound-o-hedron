@@ -23,11 +23,14 @@ void dodecaFill(uint8_t frontFace, uint8_t bri, uint8_t value, CRGBPalette16 pal
                 litRemainder = coloredPixels - litPixels;
             }
             coloredPixels -= EDGE_LENGTH;
+
+            int i = 0;
             
             for (int8_t *edge = comboEdgeGroups[face_list_num[edge_list_index]]; *edge != 0; edge++) {
                 
                 int led_num_start = 0;
                 int8_t edge_num = *edge;
+                if (edge_list_index == 2 && i % 2 == 0) { edge_num = 0-edge_num; }// invert the directionality on the half of the ring edges
                 if (edge_list_index == 3) { edge_num = 0-edge_num; }// invert the directionality on the opposite sparks part
                 
                 if (edge_num > 0) {
@@ -39,6 +42,7 @@ void dodecaFill(uint8_t frontFace, uint8_t bri, uint8_t value, CRGBPalette16 pal
                     for (int i = 0; i < litPixels; i++) { leds[led_num_start - i] = ColorFromPalette(palette, 255 * (edge_list_index * EDGE_LENGTH + i) / 5 / EDGE_LENGTH, bri, LINEARBLEND); }
                     if (litRemainder > 0) { leds[led_num_start - litPixels] = ColorFromPalette(palette, 255 * (edge_list_index * EDGE_LENGTH + litPixels) / 5 / EDGE_LENGTH, bri * litRemainder, LINEARBLEND); } 
                 }
+                i++;
             }
         } else {
             break;
