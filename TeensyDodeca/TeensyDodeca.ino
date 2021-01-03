@@ -38,7 +38,7 @@
 int currentMode = 0;
 
 //#define TIME_DEBUG
-#define DMX_DEBUG
+//#define DMX_DEBUG
 #ifdef DMX_DEBUG
 uint8_t dmx_params[5];
 #endif
@@ -115,16 +115,14 @@ void loop()
             break;
           case DMX_MODE:
             Blackout();
-            brightnessAnalog.update();
-//            flash(0xF0 | map(brightnessAnalog.getValue(), 0, 1023, 0, 0xF), 128, 200, RainbowColors_p);
-            flash(0x92, 128, map(brightnessAnalog.getValue(), 0, 1023, 0, 0xFF), RainbowColors_p);
+            DisplayFromDMX();
             break;
           case 3:
             MarkEdges();
             break;
           default:
             Blackout();
-            break;    
+            break;
         }
 #endif
         
@@ -162,6 +160,44 @@ void ReadDMX(){
             while(Wire1.available()) {
                 Wire1.read();
             }
+        }
+    }
+}
+
+void DisplayFromDMX() {
+    for (int i = 2; i>=0; i--) {
+        uint8_t modeNum = ceil(dmxData[i] / 10);
+        switch (modeNum) {
+          case 1:
+            flash(dmxData[5+7*i], dmxData[4+7*i], dmxData[3+7*i], createPalette(dmxData[6+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            break;
+          case 2:
+            impulse(dmxData[5+7*i], dmxData[4+7*i], dmxData[3+7*i], createPalette(dmxData[6+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            break;
+          case 3:
+            strobe(dmxData[5+7*i], dmxData[4+7*i], dmxData[3+7*i], createPalette(dmxData[6+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            break;
+          case 4:
+            march(dmxData[5+7*i], dmxData[4+7*i], dmxData[3+7*i], createPalette(dmxData[6+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            break;
+          case 5:
+            dodecaBlink(dmxData[5+7*i], dmxData[4+7*i], dmxData[3+7*i], createPalette(dmxData[6+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            break;
+          case 6:
+            dodecaRipple(dmxData[5+7*i], dmxData[4+7*i], dmxData[3+7*i], createPalette(dmxData[6+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            break;
+          case 7:
+            dodecaGhosting(dmxData[5+7*i], dmxData[4+7*i], dmxData[3+7*i], createPalette(dmxData[6+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            break;
+          case 8:
+            dodecaFill(dmxData[5+7*i], dmxData[4+7*i], dmxData[3+7*i], createPalette(dmxData[6+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            break;
+          case 9:
+            marchRepl(dmxData[5+7*i], dmxData[4+7*i], dmxData[3+7*i], createPalette(dmxData[6+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            break;
+          default:
+            Blackout();
+            break;
         }
     }
 }
