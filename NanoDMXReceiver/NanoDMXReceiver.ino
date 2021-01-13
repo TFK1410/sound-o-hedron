@@ -3,7 +3,7 @@
 
 #define SLAVE_ADDRESS 0x01
 #define START_CHANNEL 8
-#define COUNT_CHANNEL 21
+#define COUNT_CHANNEL 24
 char dmxs[COUNT_CHANNEL + 1];
 
 void setup()
@@ -26,8 +26,8 @@ void requestEvent() {
   else
     dmxs[0] = 0;
 
-  for (int i = 1; i <= COUNT_CHANNEL; i++) {
-    dmxs[i] = DMXSerial.read(START_CHANNEL + COUNT_CHANNEL);
+  for (int i = 0; i < COUNT_CHANNEL; i++) {
+    dmxs[i+1] = DMXSerial.read(START_CHANNEL + i);
   }
 
   Wire.write(dmxs, COUNT_CHANNEL + 1);
