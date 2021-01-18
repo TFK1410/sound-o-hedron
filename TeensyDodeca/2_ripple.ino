@@ -1,15 +1,15 @@
 #define MAX_RIPPLES 70
 #define RIPPLE_SPACING_BRI 5
 #define RIPPLE_SPACING_PAL 12
-#define RIPPLE_INITS_ITER_DELAY MAX_RIPPLES * 4
+#define RIPPLE_INITS_ITER_DELAY MAX_RIPPLES
 
 struct RipplePosition {
     uint8_t edge;
-    int8_t pos;
+    uint8_t pos;
     int bri;
 };
 
-bool rippleInit = 1;
+uint8_t rippleInit = 1;
 
 unsigned long tickRippleLast;
 uint16_t initRippleIter = 0;
@@ -17,8 +17,8 @@ uint16_t initRippleIter = 0;
 RipplePosition ripples[MAX_RIPPLES];
 
 void dodecaRipple(uint8_t edges, uint8_t numOfRipples, uint8_t value, CRGBPalette16 palette) {
-    if (!rippleInit) {
-        for (int i = 0; i < MAX_RIPPLES; i++) { ripples[i] = (RipplePosition) {0, -1, -1000}; }
+    if (rippleInit == 1) {
+        for (int i = 0; i < MAX_RIPPLES; i++) { ripples[i] = (RipplePosition) {random8(NUM_EDGES), random8(EDGE_LENGTH), random8(255)}; }
         rippleInit = 0;
         tickRippleLast = millis();
         return;
