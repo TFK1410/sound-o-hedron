@@ -15,6 +15,7 @@
 #define NUM_LEDS_PER_STRIP 200
 #define NUM_STRIPS         3
 #define NUM_LEDS NUM_LEDS_PER_STRIP * NUM_STRIPS
+#define NUM_EDGES 30
 
 #define LED_MASTER_PIN     18
 #define LED_TYPE           WS2812
@@ -97,12 +98,13 @@ void loop()
 //        flash(0xC0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
 //        impulse(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
 //        strobe(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
-        march(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], createPalette(map(dmx_params[3], 0, 255, 0, 50), 0, 0, 0));
+//        march(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], createPalette(map(dmx_params[3], 0, 255, 0, 50), 0, 0, 0));
 //        dodecaBlink(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
 //        dodecaRipple(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
 //        dodecaGhosting(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
 //        dodecaFill(dmx_params[0], dmx_params[1], dmx_params[2], RainbowColors_p);
 //        marchRepl(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], createPalette(map(dmx_params[3], 0, 255, 0, 50), 0, 0, 0));
+        dodecaImpulse(dmx_params[0], dmx_params[1], dmx_params[2], RainbowColors_p);
         
 #else
         SetBrightness();
@@ -172,10 +174,10 @@ void DisplayFromDMX() {
         return;
     }
     for (int i = 2; i>=0; i--) {
-        uint8_t modeNum = dmxData[i] / 10;
+        uint8_t modeNum = dmxData[i] >> 4;
         switch (modeNum) {
           case 1:
-            flash(dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            flash(i, dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
             break;
           case 2:
             impulse(dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
@@ -199,7 +201,10 @@ void DisplayFromDMX() {
             dodecaFill(dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
             break;
           case 9:
-            marchRepl(dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            marchRepl(i, dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            break;
+          case 10:
+            dodecaImpulse(dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
             break;
           default:
             break;

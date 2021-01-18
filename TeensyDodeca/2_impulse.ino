@@ -10,7 +10,7 @@ void impulse(uint8_t edges, uint8_t edgeSpeed, uint8_t value, CRGBPalette16 pale
         tickImpulseLast = millis();
         return;
     }
-    edgeSpeed = 50 - map(edgeSpeed, 0, 255, 5, 50); // in ms per pixel moved
+    edgeSpeed = 50 - map(edgeSpeed, 0, 255, 0, 49); // in ms per pixel moved
     
     tickImpulsePassed = millis() - tickImpulseLast;
     if (tickImpulsePassed > edgeSpeed) {

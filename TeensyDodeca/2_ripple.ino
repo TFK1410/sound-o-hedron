@@ -1,4 +1,4 @@
-#define MAX_RIPPLES 30
+#define MAX_RIPPLES 70
 #define RIPPLE_SPACING_BRI 5
 #define RIPPLE_SPACING_PAL 12
 #define RIPPLE_INITS_ITER_DELAY MAX_RIPPLES * 5
@@ -37,7 +37,7 @@ void dodecaRipple(uint8_t edges, uint8_t numOfRipples, uint8_t value, CRGBPalett
     if (edgeCount > 0) {
         for (int i = 0; i < selectedRipples; i++) {
             if (ripples[i].bri < -RIPPLE_SPACING_BRI * EDGE_LENGTH - 255 && initRippleIter == 0) {
-                ripples[i].edge = abs(edge_list[random8(edgeCount)]) - 1;
+                ripples[i].edge = random8(NUM_EDGES);
                 ripples[i].pos = random8(EDGE_LENGTH);
                 ripples[i].bri = 255;
                 initRippleIter = RIPPLE_INITS_ITER_DELAY + 1;
@@ -47,8 +47,9 @@ void dodecaRipple(uint8_t edges, uint8_t numOfRipples, uint8_t value, CRGBPalett
                 for (int j = 0; j < EDGE_LENGTH; j++) {
                     int dist = i-j;
                     int pBrightness = ripples[i].bri + abs(dist) * RIPPLE_SPACING_BRI;
+                    uint8_t rippleEdge = abs(edge_list[ripples[i].edge % edgeCount]) - 1;
                     if (pBrightness < 256 && pBrightness > 0) {
-                         leds[EDGE_LENGTH * ripples[i].edge + j] += ColorFromPalette(palette, 128 + dist * RIPPLE_SPACING_PAL, logscale8[pBrightness], LINEARBLEND);
+                         leds[EDGE_LENGTH * rippleEdge + j] += ColorFromPalette(palette, 128 + dist * RIPPLE_SPACING_PAL, logscale8[pBrightness], LINEARBLEND);
                     }
                 }    
             }

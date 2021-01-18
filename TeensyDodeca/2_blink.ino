@@ -1,4 +1,4 @@
-#define MAX_BLINKS 60
+#define MAX_BLINKS 100
 #define BLINK_INITS_ITER_DELAY 10
 
 struct BlinkPosition {
@@ -29,17 +29,20 @@ void dodecaBlink(uint8_t edges, uint8_t numOfBlinks, uint8_t value, CRGBPalette1
 
     int8_t edge_list[NUM_LEDS / EDGE_LENGTH];
     uint8_t edgeCount = get_edge_list(edges, &edge_list[0]);
+    uint16_t ledCount = EDGE_LENGTH * edgeCount;
 
     uint8_t selectedBlinks = map(numOfBlinks, 0, 255, 0, MAX_BLINKS);
     if (edgeCount > 0) {
         for (int i = 0; i < selectedBlinks; i++) {
             if (blinks[i].bri < 1 && initBlinkIter == 0) {
-                blinks[i].pos = EDGE_LENGTH * (abs(edge_list[random8(edgeCount)]) - 1) + random8(EDGE_LENGTH);
+                blinks[i].pos = random16(NUM_LEDS);
                 blinks[i].bri = 255 - random8(20);
                 initBlinkIter = BLINK_INITS_ITER_DELAY + 1;
             } 
             if (blinks[i].pos >= 0 && blinks[i].bri > 0) {
-                leds[blinks[i].pos] = ColorFromPalette(palette, 255 / selectedBlinks * i, logscale8[blinks[i].bri], LINEARBLEND);
+                uint16_t ledPos = blinks[i].pos % ledCount;
+                uint16_t blinkPos = abs(edge_list[ledPos / EDGE_LENGTH]) - 1 + ledPos % EDGE_LENGTH;
+                leds[blinkPos] = ColorFromPalette(palette, 255 / selectedBlinks * i, logscale8[blinks[i].bri], LINEARBLEND);
             }
     
             blinks[i].bri -= ticksBlink;
