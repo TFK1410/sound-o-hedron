@@ -1,7 +1,7 @@
 #define MAX_RIPPLES 70
 #define RIPPLE_SPACING_BRI 5
 #define RIPPLE_SPACING_PAL 12
-#define RIPPLE_INITS_ITER_DELAY MAX_RIPPLES * 5
+#define RIPPLE_INITS_ITER_DELAY MAX_RIPPLES * 4
 
 struct RipplePosition {
     uint8_t edge;
@@ -12,7 +12,7 @@ struct RipplePosition {
 bool rippleInit = 1;
 
 unsigned long tickRippleLast;
-uint8_t initRippleIter = 0;
+uint16_t initRippleIter = 0;
 
 RipplePosition ripples[MAX_RIPPLES];
 

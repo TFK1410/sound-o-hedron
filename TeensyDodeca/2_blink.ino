@@ -41,7 +41,7 @@ void dodecaBlink(uint8_t edges, uint8_t numOfBlinks, uint8_t value, CRGBPalette1
             } 
             if (blinks[i].pos >= 0 && blinks[i].bri > 0) {
                 uint16_t ledPos = blinks[i].pos % ledCount;
-                uint16_t blinkPos = abs(edge_list[ledPos / EDGE_LENGTH]) - 1 + ledPos % EDGE_LENGTH;
+                uint16_t blinkPos = (abs(edge_list[ledPos / EDGE_LENGTH]) - 1) * EDGE_LENGTH + ledPos % EDGE_LENGTH;
                 leds[blinkPos] = ColorFromPalette(palette, 255 / selectedBlinks * i, logscale8[blinks[i].bri], LINEARBLEND);
             }
     
