@@ -10,14 +10,18 @@ bool ghostInit = 1;
 uint16_t ghostingPosOffset;
 uint8_t ghostingBriOffset;
 
-void dodecaGhosting(uint8_t edges, uint8_t numOfGhosts, uint8_t value, CRGBPalette16 palette) {
+void dodecaGhosting(mode_data mdata) {
+    uint8_t numOfGhosts = mdata.params[0];
+    uint8_t edges = mdata.params[1];
+    CRGBPalette16 palette = createPalette(mdata.params[2], mdata.color);
+    
     if (!ghostInit) {
         ghostInit = 0;
         tickGhostingLast = millis();
         return;
     }
     // this is expressed in milliseconds per 1 value in the brightness map
-    float tickGhostBrightness = map(logscale8[255-value], 0, 255, 15, 50) / 10.0;
+    float tickGhostBrightness = map(logscale8[255-mdata.curve], 0, 255, 15, 50) / 10.0;
 //    Serial.println(tickGhostBrightness);
 
     uint16_t ticksGhost = (millis() - tickGhostingLast) / tickGhostBrightness;

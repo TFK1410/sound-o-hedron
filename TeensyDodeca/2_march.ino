@@ -1,6 +1,10 @@
 #define MARCH_BR_THRESH 100
 
-void march(uint8_t edges, uint8_t segmentNum, uint8_t marchSpeed, CRGBPalette16 palette) {
+void march(mode_data mdata) {
+    uint8_t segmentNum = mdata.params[0];
+    uint8_t edges = mdata.params[1];
+    CRGBPalette16 palette = createPalette(mdata.params[2], mdata.color);
+    
     segmentNum = map(segmentNum, 0, 255, 1, 30);
 
     int8_t edge_list[NUM_LEDS / EDGE_LENGTH];
@@ -22,7 +26,7 @@ void march(uint8_t edges, uint8_t segmentNum, uint8_t marchSpeed, CRGBPalette16 
     if (ledIncrementStart > selectedLedCount) { 
         ledIncrementStart = 0;
     } else {
-        ledIncrementStart = ledIncrementStart + 2.0 * logscaleFloat8[marchSpeed] / 255;
+        ledIncrementStart = ledIncrementStart + 2.0 * logscaleFloat8[mdata.curve] / 255;
     }
     
     uint8_t pBrightness = 0;

@@ -16,7 +16,11 @@ uint16_t initRippleIter = 0;
 
 RipplePosition ripples[MAX_RIPPLES];
 
-void dodecaRipple(uint8_t edges, uint8_t numOfRipples, uint8_t value, CRGBPalette16 palette) {
+void dodecaRipple(mode_data mdata) {
+    uint8_t numOfRipples = mdata.params[0];
+    uint8_t edges = mdata.params[1];
+    CRGBPalette16 palette = createPalette(mdata.params[2], mdata.color);
+  
     if (rippleInit == 1) {
         for (int i = 0; i < MAX_RIPPLES; i++) { ripples[i] = (RipplePosition) {random8(NUM_EDGES), random8(EDGE_LENGTH), random8(255)}; }
         rippleInit = 0;
@@ -25,7 +29,7 @@ void dodecaRipple(uint8_t edges, uint8_t numOfRipples, uint8_t value, CRGBPalett
     }
 
     // this is expressed in milliseconds per 1 value in the brightness map
-    float tickRippleBrightness = map(logscale8[255-value], 0, 255, 20, 70) / 10.0;
+    float tickRippleBrightness = map(logscale8[255-mdata.curve], 0, 255, 20, 70) / 10.0;
 
     uint8_t ticksRipple = (millis() - tickRippleLast) / tickRippleBrightness;
     if (ticksRipple > 0) { tickRippleLast = millis(); }

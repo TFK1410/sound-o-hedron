@@ -13,7 +13,11 @@ uint8_t initBlinkIter = 0;
 
 BlinkPosition blinks[MAX_BLINKS];
 
-void dodecaBlink(uint8_t edges, uint8_t numOfBlinks, uint8_t value, CRGBPalette16 palette) {
+void dodecaBlink(mode_data mdata) {
+    uint8_t numOfBlinks = mdata.params[0];
+    uint8_t edges = mdata.params[1];
+    CRGBPalette16 palette = createPalette(mdata.params[2], mdata.color);
+  
     if (!blinkInit) {
         for (int i = 0; i < MAX_BLINKS; i++) { blinks[i] = (BlinkPosition) {-1, 0}; }
         blinkInit = 0;
@@ -22,7 +26,7 @@ void dodecaBlink(uint8_t edges, uint8_t numOfBlinks, uint8_t value, CRGBPalette1
     }
 
     // this is expressed in milliseconds per 1 value in the brightness map
-    float tickBlinkBrightness = map(logscale8[255-value], 0, 255, 10, 50) / 10.0;
+    float tickBlinkBrightness = map(logscale8[255-mdata.curve], 0, 255, 10, 50) / 10.0;
 
     uint8_t ticksBlink = (millis() - tickBlinkLast) / tickBlinkBrightness;
     if (ticksBlink > 0) { tickBlinkLast = millis(); }

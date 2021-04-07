@@ -2,13 +2,18 @@
 
 uint8_t curFill;
 
-void dodecaFill(uint8_t frontFace, uint8_t bri, uint8_t value, CRGBPalette16 palette) {
+void dodecaFill(mode_data mdata) {
+    uint8_t bri = mdata.params[0];
+    uint8_t frontFace = mdata.params[1];
+    CRGBPalette16 palette = createPalette(mdata.params[2], mdata.color);
+    
     frontFace = map(frontFace, 0, 255, 0, FACES_COUNT - 1);
+    frontFace = (frontFace + front_face_offset) % FACES_COUNT;
 
     uint8_t face_list_num[5];
     get_all_edges_from_face(frontFace, &face_list_num[0]);
 
-    nblendU8TowardU8(curFill, value, FILL_PULL_AMOUNT);
+    nblendU8TowardU8(curFill, mdata.curve, FILL_PULL_AMOUNT);
     float coloredPixels = curFill * 5 * EDGE_LENGTH / 255.0;
     
     for (int edge_list_index = 0; edge_list_index < 5; edge_list_index++) {

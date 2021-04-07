@@ -6,12 +6,16 @@
 
 CRGBArray<EDGE_LENGTH> target_flash_edge[3];
 CRGBArray<EDGE_LENGTH> current_flash_edge[3];
-                     
-void flash(uint8_t flashNum, uint8_t edges, uint8_t edgePattern, uint8_t value, CRGBPalette16 palette) {
+
+void flash(uint8_t flashNum, mode_data mdata) {
+    uint8_t edgePattern = mdata.params[0];
+    uint8_t edges = mdata.params[1];
+    CRGBPalette16 palette = createPalette(mdata.params[2], mdata.color);
+    
     uint8_t pattern = map(edgePattern, 0, 255, 0, PATT_BACKWARD);
 
-    uint8_t num_lit = value * (EDGE_LENGTH + 1) / 255;
-    uint8_t lit_remainder = (value * (EDGE_LENGTH + 1)) % 255;
+    uint8_t num_lit = mdata.curve * (EDGE_LENGTH + 1) / 255;
+    uint8_t lit_remainder = (mdata.curve * (EDGE_LENGTH + 1)) % 255;
     CRGB faded_color = ColorFromPalette(palette, (num_lit + 1) * 255 / EDGE_LENGTH - 1, lit_remainder, LINEARBLEND);
 
     uint8_t edge_start = 0;

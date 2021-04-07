@@ -2,8 +2,8 @@
 #include <DMXSerial.h>
 
 #define SLAVE_ADDRESS 0x01
-#define START_CHANNEL 8
-#define COUNT_CHANNEL 24
+#define START_CHANNEL 13
+#define COUNT_CHANNEL 25
 char dmxs[COUNT_CHANNEL + 1];
 
 void setup()

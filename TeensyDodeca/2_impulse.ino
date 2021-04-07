@@ -5,7 +5,11 @@ float tickImpulsePercentage;
 
 CRGBArray<EDGE_LENGTH> impulse_edge;
 
-void impulse(uint8_t edges, uint8_t edgeSpeed, uint8_t value, CRGBPalette16 palette) {
+void impulse(mode_data mdata) {
+    uint8_t edgeSpeed = mdata.params[0];
+    uint8_t edges = mdata.params[1];
+    CRGBPalette16 palette = createPalette(mdata.params[2], mdata.color);
+    
     if (tickImpulseLast == 0){
         tickImpulseLast = millis();
         return;
@@ -18,7 +22,7 @@ void impulse(uint8_t edges, uint8_t edgeSpeed, uint8_t value, CRGBPalette16 pale
         tickImpulsePassed = tickImpulsePassed % edgeSpeed;
 
         memcpy(&edgeHistory[1], &edgeHistory[0], EDGE_LENGTH);
-        edgeHistory[0] = value;
+        edgeHistory[0] = mdata.curve;
     }
     tickImpulsePercentage = 1.0 * tickImpulsePassed / edgeSpeed;
 

@@ -798,13 +798,13 @@ const CRGBPalette16 defPalettes[] = {
     wildwinds_gp
 };
 
-CRGBPalette16 createPalette(uint8_t code, uint8_t r, uint8_t g, uint8_t b) {
+CRGBPalette16 createPalette(uint8_t code, CRGB staticcolor) {
     if (code>0) {
         uint8_t elem = constrain(code, 1, sizeof(defPalettes) / sizeof(CRGBPalette16)) - 1;
         return defPalettes[elem];
     } else {
         CRGBPalette16 pal;
-        fill_solid( pal, 16, CRGB(r,g,b));
+        fill_solid( pal, 16, staticcolor);
         return pal;
     }
 }

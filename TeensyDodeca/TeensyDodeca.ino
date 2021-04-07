@@ -4,6 +4,7 @@
 #include <i2c_driver_wire.h>
 #include <i2c_driver.h>
 #include <i2c_register_slave.h>
+#include "structs.h"
 
 // The new Teensy 4 also supports parallel output, but it's done slightly differently from the above platforms. First off, there are three sets of possible pins that can be used - each of the three set of pins, in order:
 //
@@ -16,6 +17,7 @@
 #define NUM_STRIPS         3
 #define NUM_LEDS NUM_LEDS_PER_STRIP * NUM_STRIPS
 #define NUM_EDGES 30
+#define FACES_COUNT 12
 
 #define LED_MASTER_PIN     18
 #define LED_TYPE           WS2812
@@ -23,7 +25,7 @@
 #define UPDATES_PER_SECOND 100
 
 #define SLAVE_ADDRESS   0x01
-#define DMX_BYTES_COUNT 25 //first byte marking changes + 3 sections (first 3 bytes selecting modes): 7 channels each: 4 for control + 3 for color
+#define DMX_BYTES_COUNT 26 //first byte marking changes + 3 sections (first 3 bytes selecting modes + byte for front face): 7 channels each: 4 for control + 3 for color
 #define DMX_UPDATES_PER_SECOND 60
 
 #define MIN_BRIGHTNESS 10
@@ -40,8 +42,10 @@ int currentMode = 0;
 
 //#define TIME_DEBUG
 //#define DMX_DEBUG
+
 #ifdef DMX_DEBUG
 uint8_t dmx_params[5];
+mode_data mdatatest;
 #endif
 
 CRGBArray<NUM_LEDS> leds;
@@ -49,7 +53,8 @@ CRGBArray<NUM_LEDS> leds;
 CRGBPalette16 currentPalette;
 TBlendType    currentBlending;
 
-uint8_t dmxData[DMX_BYTES_COUNT-1]{0};
+dmx_data dmxData;
+uint8_t front_face_offset;
 
 ResponsiveAnalogRead brightnessAnalog(ANALOG_PIN, true);
 int brightnessValue = (MIN_BRIGHTNESS + MAX_BRIGHTNESS) / 2;
@@ -77,9 +82,11 @@ void setup() {
 void loop()
 {
 
+#ifndef DMX_DEBUG
     EVERY_N_MILLISECONDS(1000 / DMX_UPDATES_PER_SECOND){
         ReadDMX();
     }
+#endif
 
     EVERY_N_MILLISECONDS(1000 / UPDATES_PER_SECOND) {
       
@@ -93,6 +100,14 @@ void loop()
 
         brightnessAnalog.update();
         dmx_params[currentMode] = map(brightnessAnalog.getValue(), 0, 1023, 0, 255);
+
+        mdatatest.curve = dmx_params[0];
+        mdatatest.params[0] = dmx_params[1];
+        mdatatest.params[1] = dmx_params[2];
+        mdatatest.params[2] = dmx_params[3];
+        mdatatest.color = CRGB(0xff,0xff,0xff);
+        
+//        Serial.printf("%d, %d, %d, %d\n", mdatatest.params[0], mdatatest.params[1], mdatatest.params[2], mdatatest.curve);
         
         Blackout();
 //        flash(0xC0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
@@ -104,7 +119,11 @@ void loop()
 //        dodecaGhosting(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], RainbowColors_p);
 //        dodecaFill(dmx_params[0], dmx_params[1], dmx_params[2], RainbowColors_p);
 //        marchRepl(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], createPalette(map(dmx_params[3], 0, 255, 0, 50), 0, 0, 0));
-        dodecaImpulse(dmx_params[0], dmx_params[1], dmx_params[2], RainbowColors_p);
+//        dodecaImpulse(dmx_params[0], dmx_params[1], dmx_params[2], RainbowColors_p);
+//        dodecaImpulse(mdatatest);
+        dodecaImpulseHalf(mdatatest);
+//        mdatatest.params[1] |= 0xF0;
+//        dodecaRipple(mdatatest);
         
 #else
         SetBrightness();
@@ -150,16 +169,34 @@ void SetBrightness(){
     }
 }
 
+void parseDMXData(uint8_t d[]) {
+    for (int i = 0; i < DMX_MODE_COUNT; i++) {
+        dmxData.modes[i] = d[i] >> 4;
+    }
+    dmxData.front_face = map(d[DMX_MODE_COUNT], 0, 255, 0, FACES_COUNT - 1);
+    front_face_offset = dmxData.front_face;
+    for (int i = 0; i < DMX_MODE_COUNT; i++) {
+        int start = DMX_MODE_COUNT+1+i*7;
+        dmxData.mdata[i].params[0] = d[start+0];
+        dmxData.mdata[i].params[1] = d[start+1];
+        dmxData.mdata[i].params[2] = d[start+2];
+        dmxData.mdata[i].curve = d[start+3];
+        dmxData.mdata[i].color = CRGB(d[start+4],d[start+5],d[start+6]);
+    }
+}
+
 void ReadDMX(){
     Wire1.requestFrom(SLAVE_ADDRESS, DMX_BYTES_COUNT);   // request DMX data from slave device
     int availableCount = Wire1.available();              // if ready read the data from the slave
     if (availableCount >= DMX_BYTES_COUNT) {
         if (Wire1.read() == 255) {                       // new DMX data is being sent
 //            Serial.println("New Data");
+            uint8_t dmxData[DMX_BYTES_COUNT-1];
             for (int i = 0; i < DMX_BYTES_COUNT-1; i++) {
                 dmxData[i] = Wire1.read();
 //                Serial.println(dmxData[i]);
             }
+            parseDMXData(dmxData);
         } else {                                         // no new data - flush buffer
             while(Wire1.available()) {
                 Wire1.read();
@@ -169,42 +206,44 @@ void ReadDMX(){
 }
 
 void DisplayFromDMX() {
-    if (dmxData[0] == 0 && dmxData[1] == 0 && dmxData[2] == 0) {
+    if (dmxData.modes[0] == 0 && dmxData.modes[1] == 0 && dmxData.modes[2] == 0) {
         Blackout();
         return;
     }
     for (int i = 2; i>=0; i--) {
-        uint8_t modeNum = dmxData[i] >> 4;
-        switch (modeNum) {
+        switch (dmxData.modes[i]) {
           case 1:
-            flash(i, dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            flash(i, dmxData.mdata[i]);
             break;
           case 2:
-            impulse(dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            impulse(dmxData.mdata[i]);
             break;
           case 3:
-            strobe(dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            strobe(dmxData.mdata[i]);
             break;
           case 4:
-            march(dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            march(dmxData.mdata[i]);
             break;
           case 5:
-            dodecaBlink(dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            dodecaBlink(dmxData.mdata[i]);
             break;
           case 6:
-            dodecaRipple(dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            dodecaRipple(dmxData.mdata[i]);
             break;
           case 7:
-            dodecaGhosting(dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            dodecaGhosting(dmxData.mdata[i]);
             break;
           case 8:
-            dodecaFill(dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            dodecaFill(dmxData.mdata[i]);
             break;
           case 9:
-            marchRepl(i, dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            marchRepl(i, dmxData.mdata[i]);
             break;
           case 10:
-            dodecaImpulse(dmxData[4+7*i], dmxData[3+7*i], dmxData[6+7*i], createPalette(dmxData[5+7*i], dmxData[7+7*i], dmxData[8+7*i], dmxData[9+7*i]));
+            dodecaImpulse(dmxData.mdata[i]);
+            break;
+          case 11:
+            dodecaImpulseHalf(dmxData.mdata[i]);
             break;
           default:
             break;

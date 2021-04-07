@@ -4,8 +4,12 @@
 CRGBArray<EDGE_LENGTH> target_march_edge[3];
 CRGBArray<EDGE_LENGTH> current_march_edge[3];
 
-void marchRepl(uint8_t marchReplNum, uint8_t edges, uint8_t segmentFill, uint8_t marchPhase, CRGBPalette16 palette) {
-    float marchCenter = EDGE_LENGTH * marchPhase / 255.0;
+void marchRepl(uint8_t marchReplNum, mode_data mdata) {
+    uint8_t segmentFill = mdata.params[0];
+    uint8_t edges = mdata.params[1];
+    CRGBPalette16 palette = createPalette(mdata.params[2], mdata.color);
+  
+    float marchCenter = EDGE_LENGTH * mdata.curve / 255.0;
 
     float marchCenterDistance = 0;
     

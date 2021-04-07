@@ -32,6 +32,7 @@ void get_face_list_nums_from_dmx_byte(uint8_t edge_byte, uint8_t *face_list_num)
     } else {
         uint8_t main_face = edge_byte & 0x0F;
         if (main_face > 0 && main_face <= FACES_COUNT){
+            main_face = (main_face + front_face_offset) % FACES_COUNT;
             if(edge_byte & 0x80) { // is the face itself selected
                 face_list_num[0] = main_face - 1;
             }
