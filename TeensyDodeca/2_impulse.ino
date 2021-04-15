@@ -1,30 +1,40 @@
 uint8_t edgeHistory[EDGE_LENGTH+1];
-unsigned long tickImpulseLast;
-unsigned long tickImpulsePassed;
+unsigned long tIL; // tickImpulseLast
+unsigned long tIP; // tickImpulsePassed
 float tickImpulsePercentage;
 
 CRGBArray<EDGE_LENGTH> impulse_edge;
+
+#define TIMIN 4000
+#define TIMAX 35000
 
 void impulse(mode_data mdata) {
     uint8_t edgeSpeed = mdata.params[0];
     uint8_t edges = mdata.params[1];
     CRGBPalette16 palette = createPalette(mdata.params[2], mdata.color);
     
-    if (tickImpulseLast == 0){
-        tickImpulseLast = millis();
+    if (tIL == 0){
+        tIL = millis();
         return;
     }
-    edgeSpeed = 50 - map(edgeSpeed, 0, 255, 0, 49); // in ms per pixel moved
     
-    tickImpulsePassed = millis() - tickImpulseLast;
-    if (tickImpulsePassed > edgeSpeed) {
-        tickImpulseLast = millis();
-        tickImpulsePassed = tickImpulsePassed % edgeSpeed;
+    unsigned long edgeSpeedLong = TIMAX - edgeSpeed * (TIMAX - TIMIN) / 255; // in microseconds per pixel moved
 
-        memcpy(&edgeHistory[1], &edgeHistory[0], EDGE_LENGTH);
-        edgeHistory[0] = mdata.curve;
+    tIP += micros() - tIL;
+    tIL = micros();
+    uint8_t increments = tIP / edgeSpeedLong;
+    if (increments > 5) {
+        tIP = 0;
+        memset(&edgeHistory[0], 0, EDGE_LENGTH+1);
+    } else if (increments > 0) {
+        tIP %= edgeSpeedLong;
+
+        memcpy(&edgeHistory[increments], &edgeHistory[0], EDGE_LENGTH+2-increments);
+        for (int i = 0; i < increments; i++) {
+            edgeHistory[i] = mdata.curve;
+        }
     }
-    tickImpulsePercentage = 1.0 * tickImpulsePassed / edgeSpeed;
+    tickImpulseDodecaPercentage = 1.0 * tIP / edgeSpeedLong;
 
     uint8_t i=0;
     for(CRGB & pixel : impulse_edge) { 

@@ -22,12 +22,8 @@ void dodecaGhosting(mode_data mdata) {
     }
     // this is expressed in milliseconds per 1 value in the brightness map
     float tickGhostBrightness = map(logscale8[255-mdata.curve], 0, 255, 15, 50) / 10.0;
-//    Serial.println(tickGhostBrightness);
 
     uint16_t ticksGhost = (millis() - tickGhostingLast) / tickGhostBrightness;
-//    Serial.println(ticksGhost);
-//    Serial.println(tickGhostingLast);
-//    Serial.println((millis() - tickGhostingLast));
     if (ticksGhost > 0) { tickGhostingLast = millis(); }
 
     ghostingBriOffset += ticksGhost;

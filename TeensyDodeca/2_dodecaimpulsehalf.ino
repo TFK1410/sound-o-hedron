@@ -1,28 +1,37 @@
 uint8_t dodecaHalfHistory[5*EDGE_LENGTH/2+1];
-unsigned long tickImpulseDodecaHLast;
-unsigned long tickImpulseDodecaHalfPassed;
+unsigned long tIDHL; // last
+unsigned long tIDHP; // passed
 float tickImpulseDodecaHalfPercentage;
+
+#define TDIHMIN 4000
+#define TDIHMAX 35000
 
 void dodecaImpulseHalf(mode_data mdata) {
     uint8_t dodecaSpeed = mdata.params[0];
     uint8_t frontFace = mdata.params[1];
     CRGBPalette16 palette = createPalette(mdata.params[2], mdata.color);
     
-    if (tickImpulseDodecaHLast == 0){
-        tickImpulseDodecaHLast = millis();
+    if (tIDHL == 0){
+        tIDHL = micros();
         return;
     }
-    dodecaSpeed = 50 - map(dodecaSpeed, 0, 255, 0, 49); // in ms per pixel moved
+    unsigned long dodecaSpeedLong = TDIHMAX - dodecaSpeed * (TDIHMAX - TDIHMIN) / 255; // in microseconds per pixel moved
     
-    tickImpulseDodecaHalfPassed = millis() - tickImpulseDodecaHLast;
-    if (tickImpulseDodecaHalfPassed > dodecaSpeed) {
-        tickImpulseDodecaHLast = millis();
-        tickImpulseDodecaHalfPassed = tickImpulseDodecaHalfPassed % dodecaSpeed;
+    tIDHP += micros() - tIDHL;
+    tIDHL = micros();
+    uint8_t increments = tIDHP / dodecaSpeedLong;
+    if (increments > 5) {
+        tIDHP = 0;
+        memset(&dodecaHistory[0], 0, 5*EDGE_LENGTH/2+1);
+    } else if (increments > 0) {
+        tIDHP %= dodecaSpeedLong;
 
-        memcpy(&dodecaHalfHistory[1], &dodecaHalfHistory[0], 5*EDGE_LENGTH/2);
-        dodecaHalfHistory[0] = mdata.curve;
+        memcpy(&dodecaHalfHistory[increments], &dodecaHalfHistory[0], 5*EDGE_LENGTH/2+2-increments);
+        for (int i = 0; i < increments; i++) {
+            dodecaHalfHistory[i] = mdata.curve;
+        }
     }
-    tickImpulseDodecaHalfPercentage = 1.0 * tickImpulseDodecaHalfPassed / dodecaSpeed;
+    tickImpulseDodecaHalfPercentage = 1.0 * tIDHP / dodecaSpeedLong;
 
     frontFace = map(frontFace, 0, 255, 0, FACES_COUNT - 1);
     frontFace = (frontFace + front_face_offset) % FACES_COUNT;

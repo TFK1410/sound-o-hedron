@@ -99,12 +99,15 @@ void loop()
 #ifdef DMX_DEBUG
 
         brightnessAnalog.update();
-        dmx_params[currentMode] = map(brightnessAnalog.getValue(), 0, 1023, 0, 255);
-
-        mdatatest.curve = dmx_params[0];
-        mdatatest.params[0] = dmx_params[1];
-        mdatatest.params[1] = dmx_params[2];
-        mdatatest.params[2] = dmx_params[3];
+//        dmx_params[currentMode] = map(brightnessAnalog.getValue(), 0, 1023, 0, 255);
+//        mdatatest.curve = dmx_params[0];
+//        mdatatest.params[0] = dmx_params[1];
+//        mdatatest.params[1] = dmx_params[2];
+//        mdatatest.params[2] = dmx_params[3];
+        mdatatest.curve += 1;
+        mdatatest.params[0] = map(brightnessAnalog.getValue(), 0, 1023, 0, 255);
+        mdatatest.params[1] = 0xf1;
+        mdatatest.params[2] = 0x00;
         mdatatest.color = CRGB(0xff,0xff,0xff);
         
 //        Serial.printf("%d, %d, %d, %d\n", mdatatest.params[0], mdatatest.params[1], mdatatest.params[2], mdatatest.curve);
@@ -121,7 +124,7 @@ void loop()
 //        marchRepl(0xF0 | map(dmx_params[0], 0, 255, 0, 0xF), dmx_params[1], dmx_params[2], createPalette(map(dmx_params[3], 0, 255, 0, 50), 0, 0, 0));
 //        dodecaImpulse(dmx_params[0], dmx_params[1], dmx_params[2], RainbowColors_p);
 //        dodecaImpulse(mdatatest);
-        dodecaImpulseHalf(mdatatest);
+        flash(1, mdatatest);
 //        mdatatest.params[1] |= 0xF0;
 //        dodecaRipple(mdatatest);
         

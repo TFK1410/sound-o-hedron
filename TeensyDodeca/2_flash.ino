@@ -1,8 +1,9 @@
 #define FLASH_PULL_AMOUNT 50
 
-#define PATT_CENTER 0
-#define PATT_FORWARD 1
-#define PATT_BACKWARD 2
+#define PATT_CENTER_INNER 0
+#define PATT_CENTER_OUTER 1
+#define PATT_FORWARD 2
+#define PATT_BACKWARD 3
 
 CRGBArray<EDGE_LENGTH> target_flash_edge[3];
 CRGBArray<EDGE_LENGTH> current_flash_edge[3];
@@ -14,35 +15,67 @@ void flash(uint8_t flashNum, mode_data mdata) {
     
     uint8_t pattern = map(edgePattern, 0, 255, 0, PATT_BACKWARD);
 
-    uint8_t num_lit = mdata.curve * (EDGE_LENGTH + 1) / 255;
-    uint8_t lit_remainder = (mdata.curve * (EDGE_LENGTH + 1)) % 255;
-    CRGB faded_color = ColorFromPalette(palette, (num_lit + 1) * 255 / EDGE_LENGTH - 1, lit_remainder, LINEARBLEND);
+    uint8_t edge_length = EDGE_LENGTH;
+    if (pattern == PATT_CENTER_INNER || pattern == PATT_CENTER_OUTER) {
+        edge_length /= 2;
+    }
 
-    uint8_t edge_start = 0;
-    uint8_t edge_end = EDGE_LENGTH;
-
-    for(CRGB & pixel : target_flash_edge[flashNum]) { pixel = CRGB::Black; }
-    if (num_lit > 0) {
-        
-        if (num_lit >= EDGE_LENGTH) {} 
-        else if (pattern == PATT_CENTER) {
-            edge_start = (EDGE_LENGTH - num_lit) / 2;
-            edge_end = (EDGE_LENGTH + num_lit) / 2 - 1;
-            
-            if (num_lit % 2 == 0) {
-                target_flash_edge[flashNum][edge_start - 1] = faded_color;
-            } else {
-                target_flash_edge[flashNum][edge_end + 1] = faded_color;
-            }        
-        } else if (pattern == PATT_FORWARD) {
-            edge_end = num_lit - 1;
-            target_flash_edge[flashNum][edge_end + 1] = faded_color;
-        } else if (pattern == PATT_BACKWARD) {
-            edge_start = EDGE_LENGTH + 1 - num_lit;
-            target_flash_edge[flashNum][edge_start - 1] = faded_color;
-        }
-
-        for(int i = edge_start; i < edge_end; i++) { target_flash_edge[flashNum][i] = ColorFromPalette(palette, i * 255 / EDGE_LENGTH - 1, 255, LINEARBLEND); } 
+    int8_t num_lit = mdata.curve * edge_length / 255;
+    uint8_t lit_remainder = (mdata.curve * edge_length) % 255;
+    int iter = 0;
+    switch (pattern) {
+        case PATT_CENTER_INNER:
+            for(CRGB & pixel : target_flash_edge[flashNum]) {
+                if ((iter < edge_length && num_lit > edge_length - iter - 1) || (iter > edge_length-1 && num_lit > iter - edge_length)) {
+                    pixel = ColorFromPalette(palette, iter * 255 / (EDGE_LENGTH-1), 255, LINEARBLEND);
+                } else if (num_lit == edge_length - iter - 1 || (iter > edge_length-1 && num_lit == iter - edge_length)) {
+                    pixel = ColorFromPalette(palette, iter * 255 / (EDGE_LENGTH-1), lit_remainder, LINEARBLEND);
+                } else {
+                    pixel = CRGB::Black;
+                }
+                iter++;
+            }
+            break;
+        case PATT_CENTER_OUTER:
+            for(CRGB & pixel : target_flash_edge[flashNum]) {
+                if (num_lit > iter || (iter > edge_length-1 && num_lit > EDGE_LENGTH - iter - 1)) {
+                    pixel = ColorFromPalette(palette, iter * 255 / (EDGE_LENGTH-1), 255, LINEARBLEND);
+                } else if (num_lit == iter || (iter > edge_length-1 && num_lit == EDGE_LENGTH - iter - 1)) {
+                    pixel = ColorFromPalette(palette, iter * 255 / (EDGE_LENGTH-1), lit_remainder, LINEARBLEND);
+                } else {
+                    pixel = CRGB::Black;
+                }
+                iter++;
+            }
+            break;
+        case PATT_FORWARD:
+            for(CRGB & pixel : target_flash_edge[flashNum]) {
+                if (num_lit > 0) {
+                    pixel = ColorFromPalette(palette, iter * 255 / (EDGE_LENGTH-1), 255, LINEARBLEND);
+                } else if (num_lit == 0) {
+                    pixel = ColorFromPalette(palette, iter * 255 / (EDGE_LENGTH-1), lit_remainder, LINEARBLEND);
+                } else {
+                    pixel = CRGB::Black;
+                }
+                iter++;
+                num_lit--;
+            }
+            break;
+        case PATT_BACKWARD:
+            for(CRGB & pixel : target_flash_edge[flashNum]) {
+                if (num_lit > EDGE_LENGTH - iter - 1) {
+                    pixel = ColorFromPalette(palette, iter * 255 / (EDGE_LENGTH-1), 255, LINEARBLEND);
+                } else if (num_lit == EDGE_LENGTH - iter - 1) {
+                    pixel = ColorFromPalette(palette, iter * 255 / (EDGE_LENGTH-1), lit_remainder, LINEARBLEND);
+                } else {
+                    pixel = CRGB::Black;
+                }
+                iter++;
+            }
+            break;
+        default:
+            for(CRGB & pixel : target_flash_edge[flashNum]) { pixel = CRGB::Black; }
+            break;
     }
 
     for (byte i=0; i < EDGE_LENGTH; i++) {
