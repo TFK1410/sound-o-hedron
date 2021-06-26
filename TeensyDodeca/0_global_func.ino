@@ -43,7 +43,7 @@ void get_face_list_nums_from_dmx_byte(uint8_t edge_byte, uint8_t *face_list_num)
                 face_list_num[2] = main_face - 1 + 2*FACES_COUNT;
             }
             if(edge_byte & 0x10) { // is the opposite face selected
-                face_list_num[3] = (main_face - 1 + FACES_COUNT * 3 / 2) % (FACES_COUNT);
+                face_list_num[3] = (main_face - 1 + FACES_COUNT / 2) % (FACES_COUNT);
             }
         }
     }
@@ -124,6 +124,24 @@ void nblendU8TowardU8( uint8_t& cur, const uint8_t target, uint8_t amount)
   } else {
     uint8_t delta = cur - target;
     delta = scale8_video( delta, amount);
+    cur -= delta;
+  }
+}
+
+
+void nblendU16TowardU16( uint16_t& cur, const uint16_t target, uint16_t amount)
+{
+  if( cur == target) return;
+ 
+  if( cur < target ) {
+    uint16_t delta = target - cur;
+    delta = scale16( delta, amount);
+    delta = (delta == 0) ? 1 : delta;
+    cur += delta;
+  } else {
+    uint16_t delta = cur - target;
+    delta = scale16( delta, amount);
+    delta = (delta == 0) ? 1 : delta;
     cur -= delta;
   }
 }

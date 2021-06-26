@@ -1,4 +1,5 @@
-uint8_t dodecaHistory[5*EDGE_LENGTH+1];
+//uint8_t dodecaHistory[5*EDGE_LENGTH+1];
+CircularBuffer<uint8_t,5*EDGE_LENGTH+1> dodecaHistory;
 unsigned long tIDL; // tickImpulseDodecaLast
 unsigned long tIDP; // tickImpulseDodecaPassed
 float tickImpulseDodecaPercentage;
@@ -22,13 +23,15 @@ void dodecaImpulse(mode_data mdata) {
     uint8_t increments = tIDP / dodecaSpeedLong;
     if (increments > 5) {
         tIDP = 0;
-        memset(&dodecaHistory[0], 0, 5*EDGE_LENGTH+1);
+//        memset(&dodecaHistory[0], 0, 5*EDGE_LENGTH+1);
+        dodecaHistory.clear();
     } else if (increments > 0) {
         tIDP %= dodecaSpeedLong;
 
-        memcpy(&dodecaHistory[increments], &dodecaHistory[0], 5*EDGE_LENGTH+2-increments);
+//        memcpy(&dodecaHistory[increments], &dodecaHistory[0], 5*EDGE_LENGTH+2-increments);
         for (int i = 0; i < increments; i++) {
-            dodecaHistory[i] = mdata.curve;
+//            dodecaHistory[i] = mdata.curve;
+            dodecaHistory.unshift(mdata.curve);
         }
     }
     tickImpulseDodecaPercentage = 1.0 * tIDP / dodecaSpeedLong;
@@ -52,13 +55,15 @@ void dodecaImpulse(mode_data mdata) {
             if (edge_num > 0) {
                 led_num_start = EDGE_LENGTH * (edge_num - 1);
                 for (int i = 0; i < EDGE_LENGTH; i++) { 
-                    float pBrightness = dodecaHistory[EDGE_LENGTH*edge_list_index+i] * (1 - tickImpulseDodecaPercentage) + dodecaHistory[EDGE_LENGTH*edge_list_index+i+1] * tickImpulseDodecaPercentage;
+                    uint16_t historyIndex = EDGE_LENGTH*edge_list_index+i;
+                    float pBrightness = dodecaHistory[historyIndex] * (1 - tickImpulseDodecaPercentage) + dodecaHistory[historyIndex+1] * tickImpulseDodecaPercentage;
                     leds[led_num_start + i] = ColorFromPalette(palette, 255 * (edge_list_index * EDGE_LENGTH + i) / 5 / EDGE_LENGTH, pBrightness, LINEARBLEND); 
                 }
             } else if (edge_num < 0) {
                 led_num_start = EDGE_LENGTH * (0 - edge_num) - 1;
                 for (int i = 0; i < EDGE_LENGTH; i++) { 
-                    float pBrightness = dodecaHistory[EDGE_LENGTH*edge_list_index+i] * (1 - tickImpulseDodecaPercentage) + dodecaHistory[EDGE_LENGTH*edge_list_index+i+1] * tickImpulseDodecaPercentage;
+                    uint16_t historyIndex = EDGE_LENGTH*edge_list_index+i;
+                    float pBrightness = dodecaHistory[historyIndex] * (1 - tickImpulseDodecaPercentage) + dodecaHistory[historyIndex+1] * tickImpulseDodecaPercentage;
                     leds[led_num_start - i] = ColorFromPalette(palette, 255 * (edge_list_index * EDGE_LENGTH + i) / 5 / EDGE_LENGTH, pBrightness, LINEARBLEND);
                 }
             }

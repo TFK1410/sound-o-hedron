@@ -1,4 +1,5 @@
-uint8_t dodecaHalfHistory[5*EDGE_LENGTH/2+1];
+//uint8_t dodecaHalfHistory[5*EDGE_LENGTH/2+1];
+CircularBuffer<uint8_t,5*EDGE_LENGTH/2+1> dodecaHalfHistory;
 unsigned long tIDHL; // last
 unsigned long tIDHP; // passed
 float tickImpulseDodecaHalfPercentage;
@@ -22,13 +23,15 @@ void dodecaImpulseHalf(mode_data mdata) {
     uint8_t increments = tIDHP / dodecaSpeedLong;
     if (increments > 5) {
         tIDHP = 0;
-        memset(&dodecaHistory[0], 0, 5*EDGE_LENGTH/2+1);
+//        memset(&dodecaHalfHistory[0], 0, 5*EDGE_LENGTH/2+1);
+        dodecaHalfHistory.clear();
     } else if (increments > 0) {
         tIDHP %= dodecaSpeedLong;
 
-        memcpy(&dodecaHalfHistory[increments], &dodecaHalfHistory[0], 5*EDGE_LENGTH/2+2-increments);
+//        memcpy(&dodecaHalfHistory[increments], &dodecaHalfHistory[0], 5*EDGE_LENGTH/2+2-increments);
         for (int i = 0; i < increments; i++) {
-            dodecaHalfHistory[i] = mdata.curve;
+//            dodecaHalfHistory[i] = mdata.curve;
+            dodecaHalfHistory.unshift(mdata.curve);
         }
     }
     tickImpulseDodecaHalfPercentage = 1.0 * tIDHP / dodecaSpeedLong;
@@ -52,14 +55,14 @@ void dodecaImpulseHalf(mode_data mdata) {
             if (edge_num > 0) {
                 led_num_start = EDGE_LENGTH * (edge_num - 1);
                 for (int i = 0; i < EDGE_LENGTH; i++) {
-                    int historyIndex = abs(EDGE_LENGTH*edge_list_index+i - 5*EDGE_LENGTH/2);
+                    uint16_t historyIndex = abs(EDGE_LENGTH*edge_list_index+i - 5*EDGE_LENGTH/2);
                     float pBrightness = dodecaHalfHistory[historyIndex] * (1 - tickImpulseDodecaHalfPercentage) + dodecaHalfHistory[historyIndex+1] * tickImpulseDodecaHalfPercentage;
                     leds[led_num_start + i] = ColorFromPalette(palette, 255 * (edge_list_index * EDGE_LENGTH + i) / 5 / EDGE_LENGTH, pBrightness, LINEARBLEND); 
                 }
             } else if (edge_num < 0) {
                 led_num_start = EDGE_LENGTH * (0 - edge_num) - 1;
                 for (int i = 0; i < EDGE_LENGTH; i++) { 
-                    int historyIndex = abs(EDGE_LENGTH*edge_list_index+i - 5*EDGE_LENGTH/2);
+                    uint16_t historyIndex = abs(EDGE_LENGTH*edge_list_index+i - 5*EDGE_LENGTH/2);
                     float pBrightness = dodecaHalfHistory[historyIndex] * (1 - tickImpulseDodecaHalfPercentage) + dodecaHalfHistory[historyIndex+1] * tickImpulseDodecaHalfPercentage;
                     leds[led_num_start - i] = ColorFromPalette(palette, 255 * (edge_list_index * EDGE_LENGTH + i) / 5 / EDGE_LENGTH, pBrightness, LINEARBLEND);
                 }

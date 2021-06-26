@@ -1,5 +1,6 @@
 #include <FastLED.h>
 #include <ResponsiveAnalogRead.h>
+#include <CircularBuffer.h>
 #include <i2c_device.h>
 #include <i2c_driver_wire.h>
 #include <i2c_driver.h>
@@ -10,7 +11,7 @@
 //
 //    First: 1,0,24,25,19,18,14,15,17,16,22,23,20,21,26,27
 //    Second: 10,12,11,13,6,9,32,8,7
-//    Third: 37, 36, 35, 34, 39, 38, 28, 31, 30
+//    Third: 37, 36, 35, 34, 39, 38, 28, 31, 30  
 
 #define EDGE_LENGTH 20
 #define NUM_LEDS_PER_STRIP 200
@@ -38,6 +39,7 @@
 #define OFF_MODE       0
 #define DEMO_MODE      1
 #define DMX_MODE       2
+#define MIDI_MODE      3
 int currentMode = 0;
 
 //#define TIME_DEBUG
@@ -64,7 +66,9 @@ void setup() {
     digitalWrite(LED_BUILTIN, HIGH);
     
     Wire1.begin();                         // join i2c bus
-    Serial.begin(9600);                    // start serial for output
+    Serial.begin(115200);                    // start serial for output
+
+    initMidi();
 
     init_group_list();                     // init edge lists
   
@@ -84,7 +88,9 @@ void loop()
 
 #ifndef DMX_DEBUG
     EVERY_N_MILLISECONDS(1000 / DMX_UPDATES_PER_SECOND){
-        ReadDMX();
+        if (currentMode == DMX_MODE) {
+            ReadDMX();
+        }
     }
 #endif
 
@@ -141,7 +147,11 @@ void loop()
             Blackout();
             DisplayFromDMX();
             break;
-          case 3:
+          case MIDI_MODE:
+            Blackout();
+            readMidi();
+            break;
+          case 4:
             MarkEdges();
             break;
           default:
