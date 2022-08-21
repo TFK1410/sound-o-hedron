@@ -40,10 +40,20 @@ void dodecaFill(mode_data mdata) {
                 
                 if (edge_num > 0) {
                     led_num_start = EDGE_LENGTH * (edge_num - 1);
+                    
+                    ///////////////////////////////////////////
+                    //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+                    if (edge_num >= 20) { led_num_start++; }
+                    
                     for (int i = 0; i < litPixels; i++) { leds[led_num_start + i] = ColorFromPalette(palette, 255 * (edge_list_index * EDGE_LENGTH + i) / 5 / EDGE_LENGTH, bri, LINEARBLEND); }
                     if (litRemainder > 0) { leds[led_num_start + litPixels] = ColorFromPalette(palette, 255 * (edge_list_index * EDGE_LENGTH + litPixels) / 5 / EDGE_LENGTH, bri * litRemainder, LINEARBLEND); } 
                 } else if (edge_num < 0) {
-                    led_num_start = EDGE_LENGTH * (0 - edge_num) - 1;
+                    led_num_start = EDGE_LENGTH * (0 - edge_num);
+                    
+                    ///////////////////////////////////////////
+                    //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+                    if (edge_num <= -20) { led_num_start++; }
+                    
                     for (int i = 0; i < litPixels; i++) { leds[led_num_start - i] = ColorFromPalette(palette, 255 * (edge_list_index * EDGE_LENGTH + i) / 5 / EDGE_LENGTH, bri, LINEARBLEND); }
                     if (litRemainder > 0) { leds[led_num_start - litPixels] = ColorFromPalette(palette, 255 * (edge_list_index * EDGE_LENGTH + litPixels) / 5 / EDGE_LENGTH, bri * litRemainder, LINEARBLEND); } 
                 }

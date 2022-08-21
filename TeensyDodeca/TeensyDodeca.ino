@@ -16,7 +16,10 @@
 #define EDGE_LENGTH 20
 #define NUM_LEDS_PER_STRIP 200
 #define NUM_STRIPS         3
-#define NUM_LEDS NUM_LEDS_PER_STRIP * NUM_STRIPS
+
+////////////////////////////////////////////
+//Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+#define NUM_LEDS NUM_LEDS_PER_STRIP * NUM_STRIPS + 1
 #define NUM_EDGES 30
 #define FACES_COUNT 12
 
@@ -40,6 +43,7 @@
 #define DEMO_MODE      1
 #define DMX_MODE       2
 #define MIDI_MODE      3
+#define MARK_MODE      4
 int currentMode = 0;
 
 //#define TIME_DEBUG
@@ -50,6 +54,7 @@ uint8_t dmx_params[5];
 mode_data mdatatest;
 #endif
 
+//Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup
 CRGBArray<NUM_LEDS> leds;
 
 CRGBPalette16 currentPalette;
@@ -151,7 +156,7 @@ void loop()
             Blackout();
             readMidi();
             break;
-          case 4:
+          case MARK_MODE:
             MarkEdges();
             break;
           default:
@@ -170,7 +175,19 @@ void loop()
 }
 
 void ReadMode(){
-    currentMode = map(analogRead(MODE_PIN), 0, 1150, 0, MODE_COUNT-1);
+//    currentMode = map(analogRead(MODE_PIN), 0, 1150, 0, MODE_COUNT-1); // detent pot
+    int cur = analogRead(MODE_PIN);
+    if (cur > 300 && cur < 320) {
+        currentMode = DEMO_MODE;
+    } else if (cur > 160 && cur < 180) {
+        currentMode = DMX_MODE;
+    } else if (cur > 80 && cur < 90) {
+        currentMode = MIDI_MODE;
+    } else if (cur > 220 && cur < 240) {
+        currentMode = MARK_MODE;
+    } else {
+        currentMode = OFF_MODE;
+    }
 }
 
 void SetBrightness(){ 

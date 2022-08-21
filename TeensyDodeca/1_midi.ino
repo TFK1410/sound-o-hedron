@@ -6,13 +6,14 @@ USBHub hub2(myusb);
 MIDIDevice midi1(myusb);
 
 //              y  x
-CRGB pad_colors[8][9];
 CRGB pad_current[8][9];
 CRGB pad_target[8][9];
+CRGB pads_speed_face[4];
+CRGB pads_speed_face_target[4];
 
 midi_state mstates[90];
-uint8_t midi_frontface = 3;
-uint8_t midiSpeed = 5;
+uint8_t midiFrontFace = 3, midiFrontFaceLight = 0;
+uint8_t midiSpeed = 5, midiSpeedLight = 0;
 
 CRGBPalette16 midi_palette;
 uint8_t midi_paletteCount;
@@ -40,16 +41,23 @@ void initMidi() {
   midi_paletteCount = sizeof(defPalettes) / sizeof(CRGBPalette16);
   midi_palette = createPalette(midi_paletteCurrent, CRGB::White);
   memset(&mstates[0], 0, sizeof(midi_state)*90);
-  midiBlink(0,0,true);
+  
+  midiBlinkInit();
   midiShuffleInit();
 
   for (uint8_t y = 0; y < 8; y++) {
       for (uint8_t x = 0; x < 9; x++) {
-          pad_colors[y][x] = CRGB::Black;
           pad_current[y][x] = CRGB::Black;
           pad_target[y][x] = CRGB::Black;
-      }  
+      }
   }
+  for (uint8_t y = 0; y < 8; y++) {
+      pad_target[y][8] = CRGB(0x3f,0x3f,0x3f);
+  }
+  for (uint8_t i = 0; i < 8; i++) {
+      pads_speed_face[i] = CRGB::White;
+  }
+  launchpad_light_update_controls();
   launchpad_last_update = 0;
   
   midi1.setHandleNoteOn(myNoteOn);
@@ -84,7 +92,6 @@ void readMidi() {
             }
             
             if (mstates[ii].effect_state) {
-//                Serial.printf("Midi fun start: %d %d %d\n", ii, column, row);
                 if (column < 4 && row < 5) {
                     midiDodecaImpulseHalf(column,row);
                 } else if (column < 4) {
@@ -94,7 +101,7 @@ void readMidi() {
                 } else if (column == 5) {
                     flashBackMaxEffect = row;
                 } else if (column == 6) {
-                    midiBlink(column, row, false);
+                    midiBlink(column, row);
                     break;
                 } else if (column == 7) {
                     midiRandomEdgeFlash(column, row);
@@ -105,7 +112,6 @@ void readMidi() {
                     midiPaletteSelect(row);
                     mstates[ii].effect_state = false;
                 }
-//                Serial.printf("Midi fun exit : %d %d %d\n", ii, column, row);
             }
         }  
     }
@@ -152,12 +158,29 @@ void myControlChange(byte channel, byte control, byte value) {
             midiSpeed = constrain(midiSpeed + 1, 0, MIDI_SPEED_COUNT_TIMES-1);
         } else if (control == 106) {
             //Arrow Left - Frontface decrease
-            midi_frontface = constrain(midi_frontface - 1, 0, FACES_COUNT-1);
+            midiFrontFace = constrain(midiFrontFace - 1, 0, FACES_COUNT-1);
         } else if (control == 107) {
             //Arrow Right - Frontface increase
-            midi_frontface = constrain(midi_frontface + 1, 0, FACES_COUNT-1);
+            midiFrontFace = constrain(midiFrontFace + 1, 0, FACES_COUNT-1);
         }
+        launchpad_light_update_controls();
     }
+}
+
+void launchpad_light_update_controls() {
+  if (midiSpeedLight != midiSpeed || midiFrontFaceLight != midiFrontFace) {
+      uint16_t v = 0x3f * (MIDI_SPEED_COUNT_TIMES - midiSpeed) / MIDI_SPEED_COUNT_TIMES;
+      CRGB clr = CRGB(v, v, v);
+      for (int i = 0; i < 4; i++) {
+          if ((midiFrontFace + 1) & (1 << (3-i))) {
+              pads_speed_face_target[i] = clr;
+          } else {
+              pads_speed_face_target[i] = CRGB::Black;
+          }
+      }
+      midiSpeedLight = midiSpeed;
+      midiFrontFaceLight = midiFrontFace;
+  }
 }
 
 void launchpad_light_update_pad(uint8_t x, uint8_t y, CRGB clr) {
@@ -186,15 +209,27 @@ void launchpad_update() {
     launchpad_last_update = ftime;
     
     uint8_t xs[LAUNCHPAD_UPDATE_COUNT], ys[LAUNCHPAD_UPDATE_COUNT];
+    CRGB pads[LAUNCHPAD_UPDATE_COUNT];
     uint8_t count = 0;
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 9; j++) {
-            if (pad_current[i][j] != pad_target[i][j] && count < LAUNCHPAD_UPDATE_COUNT) {
+    for (int i = 0; i < 8 && count < LAUNCHPAD_UPDATE_COUNT; i++) {
+        for (int j = 0; j < 9  && count < LAUNCHPAD_UPDATE_COUNT; j++) {
+            if (pad_current[i][j] != pad_target[i][j]) {
                 ys[count] = i;
                 xs[count] = j;
+                pads[count] = pad_target[i][j];
                 count++;
                 pad_current[i][j] = pad_target[i][j];
             }
+        }
+    }
+
+    for (int i = 0; i < 4 && count < LAUNCHPAD_UPDATE_COUNT; i++) {
+        if (pads_speed_face[i] != pads_speed_face_target[i]) {
+            ys[count] = 9;
+            xs[count] = 3+i;
+            pads[count] = pads_speed_face_target[i];
+            count++;
+            pads_speed_face[i] = pads_speed_face_target[i];
         }
     }
     if (count == 0) { return; }
@@ -207,7 +242,7 @@ void launchpad_update() {
     sysex_message[sizeof(launchpad_sysex_head)] = 0x0b;
 
     for (int i = 0; i < count; i++) {
-        CRGB clr = pad_target[ys[i]][xs[i]];
+        CRGB clr = pads[i];
         sysex_message[sizeof(launchpad_sysex_head) + i*4 + 1] = (ys[i]+1)*10 + xs[i]+1;
         sysex_message[sizeof(launchpad_sysex_head) + i*4 + 2] = clr.r;
         sysex_message[sizeof(launchpad_sysex_head) + i*4 + 3] = clr.g;
@@ -264,14 +299,13 @@ void midiPaletteSelect(uint8_t y) {
 
 CircularBuffer<midi_history,MIDI_HISTORY_MARKERS> midiHalfMarkers[FACES_COUNT];
 #define MIDI_HISTORY_HALF 5*EDGE_LENGTH/2
-//midi_history midiHalfMarkers[FACES_COUNT][MIDI_HISTORY_MARKERS];
 
 void midiDodecaImpulseHalf(uint8_t x, uint8_t y) {
     unsigned long ftime = millis();
     uint8_t note = y*10 + x;
 //    Serial.printf("XAddress: %p value: %d, YAddress: %p value: %d\n", xaddr, *xaddr, yaddr, *yaddr);
 
-    uint8_t face = (midi_frontface + ((y-1)*3 + x-1)) % FACES_COUNT;
+    uint8_t face = (midiFrontFace + ((y-1)*3 + x-1)) % FACES_COUNT;
     if (mstates[note].note_pressed) {
         mstates[note].note_pressed = false;
         midiHalfMarkers[face].unshift(midi_history{ftime, ftime});
@@ -347,9 +381,19 @@ void midiDodecaImpulseHalf(uint8_t x, uint8_t y) {
             
             if (edge_num > 0) {
                 led_num_start = EDGE_LENGTH * (edge_num - 1);
+
+                ////////////////////////////////////////////
+                //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+                if (edge_num >= 20) { led_num_start++; }
+                
                 led_dir = 1;
             } else if (edge_num < 0) {
                 led_num_start = EDGE_LENGTH * (0 - edge_num) - 1;
+        
+                ////////////////////////////////////////////
+                //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+                if (edge_num <= -20) { led_num_start++; }
+                
                 led_dir = -1;
             }
             
@@ -372,7 +416,7 @@ void midiDodecaImpulseFull(uint8_t x, uint8_t y) {
     unsigned long ftime = millis();
     uint8_t note = y*10 + x;
 
-    uint8_t face = (midi_frontface + ((y-1)*3 + x-1)) % FACES_COUNT;
+    uint8_t face = (midiFrontFace + ((y-1)*3 + x-1)) % FACES_COUNT;
     if (mstates[note].note_pressed) {
         mstates[note].note_pressed = false;
         midiFullMarkers[face].unshift(midi_history{ftime, ftime});
@@ -440,11 +484,22 @@ void midiDodecaImpulseFull(uint8_t x, uint8_t y) {
             flip++;
             if (edge_list_index == 3) { edge_num = 0-edge_num; }// invert the directionality on the opposite sparks part
             
+            
             if (edge_num > 0) {
                 led_num_start = EDGE_LENGTH * (edge_num - 1);
+
+                ////////////////////////////////////////////
+                //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+                if (edge_num >= 20) { led_num_start++; }
+                
                 led_dir = 1;
             } else if (edge_num < 0) {
                 led_num_start = EDGE_LENGTH * (0 - edge_num) - 1;
+        
+                ////////////////////////////////////////////
+                //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+                if (edge_num <= -20) { led_num_start++; }
+                
                 led_dir = -1;
             }
             
@@ -495,7 +550,7 @@ void midiFaceFlash(uint8_t x, uint8_t y, bool front) {
     uint8_t lit_remainder = midiCurFill[indx] & 0xff;
 
     //Get front face and sparks
-    uint8_t frontface = midi_frontface;
+    uint8_t frontface = midiFrontFace;
     if (!front) {
         frontface = (frontface + FACES_COUNT / 2) % FACES_COUNT;
     }
@@ -561,6 +616,59 @@ void midiFaceFlash(uint8_t x, uint8_t y, bool front) {
         }
     }
 }
+//
+//midi_blink midiBlinks[NUM_LEDS];
+//unsigned long midiBlinkTick;
+//
+//uint8_t midiBlinkLastY;
+//uint16_t midiBlinkIndexes[NUM_LEDS];
+////uint16_t midiBlinkSpeeds[] = {100, 50, 25, 12, 7, 4, 3, 2};
+//
+////Think about changing this mode so that it linearly scales the nth parameter
+////The lowest pad means that every nth led will be blinking, while the top one means all
+////This may mean that it would be possible to hold only a single array that contains all of the LEDs
+////This would also simplify the code
+//void midiBlink(uint8_t x, uint8_t y) {
+//    uint8_t ii = 10*y + x;
+//    if (!mstates[ii].note_held) {
+//        mstates[ii].effect_state = false;
+//        for (int i = 0; i < 8; i++) {
+//            launchpad_light_update_pad(x, i+1, CRGB::Black);
+//        }
+//        return;
+//    }
+//
+//    unsigned long ftime = millis();
+//    unsigned long delta = ftime - midiBlinkTick;
+////    uint16_t valueDelta = delta * midiBlinkSpeeds[midiSpeed];
+//    uint16_t valueDelta = delta << (7-(midiSpeed >> 1));
+//
+//    uint8_t nth = 11-y;
+//    uint16_t ledCount = NUM_LEDS / nth;
+//    if (midiBlinkLastY != y) {
+//        for (int i = 0; i < ledCount; i++) {
+//            midiBlinkIndexes[i] = i*nth + random8(nth);
+//        }
+//        midiBlinkLastY = y;
+//    }
+//
+//    for (int i = 0; i < ledCount; i++) {
+//        midi_blink *blnk = &midiBlinks[midiBlinkIndexes[i]];
+//        if (0xffff - blnk->value < valueDelta) {
+//            midiBlinkIndexes[i] = i*nth + random8(nth);
+//            blnk = &midiBlinks[midiBlinkIndexes[i]];
+//            blnk->pIndex = random8();
+//        }
+//        blnk->value -= valueDelta;
+//        leds[midiBlinkIndexes[i]] = ColorFromPalette(midi_palette, blnk->pIndex, blnk->value >> 8, LINEARBLEND);
+//    }
+//    for (int i = 0; i < y; i++) {
+//        midi_blink *blnk = &midiBlinks[midiBlinkIndexes[i]];
+//        launchpad_light_update_pad(x, i+1, ColorFromPalette(midi_palette, blnk->pIndex, blnk->value >> 8, LINEARBLEND));
+//    }
+//    
+//    midiBlinkTick = ftime;
+//}
 
 #define MIDI_BLINK_NTH_SMALL 8
 #define MIDI_BLINK_NTH_LARGE 6
@@ -574,22 +682,8 @@ unsigned long midiBlinkTick;
 //The lowest pad means that every nth led will be blinking, while the top one means all
 //This may mean that it would be possible to hold only a single array that contains all of the LEDs
 //This would also simplify the code
-void midiBlink(uint8_t x, uint8_t y, bool initBlink) {
+void midiBlink(uint8_t x, uint8_t y) {
     uint8_t ii = 10*y + x;
-    if (initBlink) {
-        for (int i = 0; i < MIDI_BLINK_COUNT_SMALL; i++ ) {
-            midiBlinksSmall[i].index = i * MIDI_BLINK_NTH_SMALL + random8(MIDI_BLINK_NTH_SMALL);
-            midiBlinksSmall[i].value = random16();
-            midiBlinksSmall[i].pIndex = random8();
-        }
-        for (int i = 0; i < MIDI_BLINK_COUNT_LARGE; i++ ) {
-            midiBlinksLarge[i].index = i * MIDI_BLINK_NTH_LARGE + random8(MIDI_BLINK_NTH_LARGE);
-            midiBlinksLarge[i].value = random16();
-            midiBlinksLarge[i].pIndex = random8();
-        }
-        midiBlinkTick = millis();
-        return;
-    }
     if (!mstates[ii].note_held) {
         mstates[ii].effect_state = false;
         for (int i = 0; i < 8; i++) {
@@ -630,52 +724,6 @@ void midiBlink(uint8_t x, uint8_t y, bool initBlink) {
 
     midiBlinkTick = ftime;
 }
-
-//midi_blink midiBlinks[NUM_LEDS];
-//unsigned long midiBlinkTick;
-//uint8_t midiBlinkLastY;
-//
-//void midiBlink(uint8_t x, uint8_t y, bool initBlink) {
-//    uint8_t ii = 10*y + x;
-//    if (initBlink) {
-//        for (int i = 0; i < NUM_LEDS; i++ ) {
-//            midiBlinks[i].index = i;
-//            midiBlinks[i].value = random16();
-//            midiBlinks[i].pIndex = random8();
-//        }
-//        midiBlinkLastY = 1;
-//        midiBlinkTick = millis();
-//        return;
-//    }
-//    if (!mstates[ii].note_held) {
-//        mstates[ii].effect_state = false;
-//        return;
-//    }
-//
-//    unsigned long ftime = millis();
-//    unsigned long delta = ftime - midiBlinkTick;
-//    uint16_t valueDelta = delta << (9-midiSpeed);
-//
-//    uint8_t nth = 9 - y;
-//    if (midiBlinkLastY != y) {
-//        for (int i = 0; i < NUM_LEDS; i += nth ) {
-//            midiBlinks[i].index = i * nth + random8(nth); 
-//        }
-//        midiBlinkLastY = y;
-//        Serial.println("Index refresh");
-//    }
-//    
-//    for (int i = 0; i < NUM_LEDS; i += nth ) {
-//        if (0xffff - midiBlinks[i].value < valueDelta) {
-//            midiBlinks[i].index = i * nth + random8(nth);
-//            midiBlinks[i].pIndex = random8();
-//        }
-//        midiBlinks[i].value -= valueDelta;
-//        leds[midiBlinks[i].index] = ColorFromPalette(midi_palette, midiBlinks[i].pIndex, midiBlinks[i].value >> 8, LINEARBLEND);
-//    }
-//
-//    midiBlinkTick = ftime;
-//}
 
 uint8_t midiRandShuffle[NUM_EDGES];
 uint8_t midiRandShuffleEdges[3*8];
@@ -770,54 +818,68 @@ void midiRandomEdgeFlashHistory(uint8_t x, uint8_t y) {
     //Update the timeSlice to equal the x number of timeWindows
     timeSlice = timeWindow * EDGE_LENGTH;
 
-    byte marker = 0;
     bool any_proceeded = false;
     uint8_t history[EDGE_LENGTH];
-        
-    for (marker = 0; marker < MIDI_HISTORY_FLASH_MARKERS && (!midiFlashMarkers[y-1][marker].ended || ftime - timeSlice < midiFlashMarkers[y-1][marker].e); marker++) {
-        //Check if any of the edges would be impacted by this run
-        bool proceed = false;
-        for (int i = 0; i < 3*8+1; i++) {
-            int8_t edge = midiFlashMarkers[y-1][marker].edges[i];
+
+    midi_flash_history midiFlashMarkersCur[MIDI_HISTORY_FLASH_MARKERS];
+    uint8_t historyMarkersKeep = 0;
+    bool firstMarker = true;
+
+    while(!midiFlashMarkers[y-1].isEmpty()) {
+        midi_flash_history mark = midiFlashMarkers[y-1].shift();
+        if (mark.ended && ftime - timeSlice > mark.e) {
+            continue;
+        }
+          
+        bool proceed = false;  
+        for (int i = 0; i < 3*y; i++) {
+            int8_t edge = mark.edges[i];
             if (edge == 0) {
-                break;
-            }
-            if (!midiFlashMap[abs(edge)]) {
+                continue;
+            } else if (!midiFlashMap[abs(edge)]) {
                 proceed = true;
-                break;
+            } else {
+                mark.edges[i] = 0;
             }
         }
+
         if (!proceed) { continue; }
         any_proceeded = true;
-        if (marker == 0 && proceed) {
-            if (midiFlashMarkers[y-1][marker].ended) {
-                launchpad_light_update_pad(x, y, ColorFromPalette(midi_palette, 255 * (ftime - midiFlashMarkers[y-1][marker].e) / timeSlice, 0xff, LINEARBLEND));
+        
+        if (firstMarker) {
+            firstMarker = false;
+            if (proceed && mark.ended) {
+                launchpad_light_update_pad(x, y, ColorFromPalette(midi_palette, 255 * (ftime - mark.e) / timeSlice, 0xff, LINEARBLEND));
             } else {
                 launchpad_light_update_pad(x, y, ColorFromPalette(midi_palette, 0x00, 0xff, LINEARBLEND));
             }
         }
-      
+
+        //Save the marker for future runs
+        midiFlashMarkersCur[historyMarkersKeep] = mark;
+        historyMarkersKeep++;
+
         memset(&history, 0, sizeof(uint8_t) * EDGE_LENGTH);
-        
+    
         int endWindow = 0;
-        if (midiFlashMarkers[y-1][marker].ended) {
-            endWindow = (ftime - midiFlashMarkers[y-1][marker].e) / timeWindow;
+        if (mark.ended) {
+            endWindow = (ftime - mark.e) / timeWindow;
         }
-        int startWindow = (ftime - midiFlashMarkers[y-1][marker].s) / timeWindow;
+        int startWindow = (ftime - mark.s) / timeWindow;
         
         if (startWindow == 0 && startWindow == endWindow) {
-            history[0] = ftime - midiFlashMarkers[y-1][marker].s;
+            history[0] = ftime - mark.s;
         } else if (startWindow == endWindow) {
-            history[startWindow] = midiFlashMarkers[y-1][marker].e - midiFlashMarkers[y-1][marker].s;
+            history[startWindow] = mark.e - mark.s;
         } else {
-            if (midiFlashMarkers[y-1][marker].ended) {
-                history[endWindow] = midiFlashMarkers[y-1][marker].e - (ftime - (endWindow+1)*timeWindow);
+            if (mark.ended) {
+                history[endWindow] = mark.e - (ftime - (endWindow+1)*timeWindow);
             } else {
                 history[endWindow] = timeWindow;
             }
             
             if (startWindow < EDGE_LENGTH) {
-                history[startWindow] = (ftime - startWindow*timeWindow) - midiFlashMarkers[y-1][marker].s;
+                history[startWindow] = (ftime - startWindow*timeWindow) - mark.s;
             } else { 
                 startWindow = EDGE_LENGTH;
             }
@@ -835,10 +897,10 @@ void midiRandomEdgeFlashHistory(uint8_t x, uint8_t y) {
             midiFlashEdge[i] = ColorFromPalette(midi_palette, 255 * i / (EDGE_LENGTH - 1), history[i], LINEARBLEND); 
         }
 
-        for (int i = 0; i < 3*8+1; i++) {
-            int8_t edge = midiFlashMarkers[y-1][marker].edges[i];
+        for (int i = 0; i < 3*y; i++) {
+            int8_t edge = mark.edges[i];
             if (edge == 0) {
-                break;
+                continue;
             }
             
             if (!midiFlashMap[abs(edge)]) {
@@ -857,16 +919,23 @@ void midiRandomEdgeFlashHistory(uint8_t x, uint8_t y) {
                 }
 
                 for (uint8_t i = 0; i < EDGE_LENGTH; i++) {
-                    leds[led_num_start + led_dir*i] = midiFlashEdge[i];
+                    if (midiFlashEdge[i]) {
+                        leds[led_num_start + led_dir*i] = midiFlashEdge[i];
+                    }
                 }
             }
         }
     }
-    
+
     //If no markers make up the history then there's no future leds to update
     if (!any_proceeded) { 
         mstates[ii].effect_state = false;
         launchpad_light_update_pad(x, y, CRGB::Black);
+    } else {
+        while(historyMarkersKeep > 0) {
+            historyMarkersKeep--;
+            midiFlashMarkers[y-1].unshift(midiFlashMarkersCur[historyMarkersKeep]);
+        }
     }
 }
 
@@ -878,6 +947,30 @@ void midiShuffle(uint8_t times) {
         midiRandShuffle[old] = midiRandShuffle[nw];
         midiRandShuffle[nw] = tmp;
     }
+}
+
+//void midiBlinkInit() {
+//    for (int i = 0; i < NUM_LEDS; i++ ) {
+//        midiBlinks[i].index = 0;
+//        midiBlinks[i].value = random16();
+//        midiBlinks[i].pIndex = random8();
+//    }
+//    midiBlinkTick = millis();
+//    midiBlinkLastY = 0;
+//}
+
+void midiBlinkInit() {
+    for (int i = 0; i < MIDI_BLINK_COUNT_SMALL; i++ ) {
+        midiBlinksSmall[i].index = i * MIDI_BLINK_NTH_SMALL + random8(MIDI_BLINK_NTH_SMALL);
+        midiBlinksSmall[i].value = random16();
+        midiBlinksSmall[i].pIndex = random8();
+    }
+    for (int i = 0; i < MIDI_BLINK_COUNT_LARGE; i++ ) {
+        midiBlinksLarge[i].index = i * MIDI_BLINK_NTH_LARGE + random8(MIDI_BLINK_NTH_LARGE);
+        midiBlinksLarge[i].value = random16();
+        midiBlinksLarge[i].pIndex = random8();
+    }
+    midiBlinkTick = millis();
 }
 
 void midiShuffleInit() {

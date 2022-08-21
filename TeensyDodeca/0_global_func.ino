@@ -6,6 +6,10 @@ void MarkEdges() {
     for (byte k=0; k < 30; k++) {
         int led_num_start = 0;
         led_num_start = EDGE_LENGTH * k;
+
+        ////////////////////////////////////////////
+        //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+        if (k >= 20) { led_num_start++; }
        
         if (k / 10 == 0) {
             leds(led_num_start, led_num_start + k % 10) = CRGB::Red;
@@ -63,6 +67,11 @@ void replicate_edge(uint8_t edgeByte, CRGBArray<EDGE_LENGTH> edge_template){
                 int8_t edge_num = *edge;
                 if (edge_num > 0) {
                     led_num_start = EDGE_LENGTH * (edge_num - 1);
+                    
+                    ////////////////////////////////////////////
+                    //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+                    if (edge_num >= 20) { led_num_start++; }
+                    
                     int j = 0;
                     for (int i = led_num_start; i < led_num_start + EDGE_LENGTH; i++) {
                         leds[i] = edge_template[j];
@@ -70,10 +79,15 @@ void replicate_edge(uint8_t edgeByte, CRGBArray<EDGE_LENGTH> edge_template){
                     }
                 } else if (edge_num < 0) {
                     led_num_start = EDGE_LENGTH * (0 - edge_num - 1);
-                    int j = 0;
-                    for (int i = led_num_start + EDGE_LENGTH - 1; i >= led_num_start; i--) {
+                    
+                    ////////////////////////////////////////////
+                    //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+                    if (edge_num >= 20) { led_num_start++; }
+                    
+                    int j = EDGE_LENGTH - 1;
+                    for (int i = led_num_start; i < led_num_start + EDGE_LENGTH; i++) {
                         leds[i] = edge_template[j];
-                        j++;
+                        j--;
                     }
                 }
             }

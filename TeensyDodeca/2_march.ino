@@ -51,8 +51,10 @@ void march(mode_data mdata) {
                     paletteValue = 0;
                     pBrightness = 0;
                 }
-
-                leds[j] = ColorFromPalette(palette, paletteValue, logscale8[pBrightness], LINEARBLEND);
+                ///////////////////////////////////////////
+                //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+                if (j >= 400 ) { leds[j+1] = ColorFromPalette(palette, paletteValue, logscale8[pBrightness], LINEARBLEND); }
+                else { leds[j] = ColorFromPalette(palette, paletteValue, logscale8[pBrightness], LINEARBLEND); }
                 
                 ledIncrement += 1;
                 if (ledIncrement > selectedLedCount) { ledIncrement -= selectedLedCount; }
@@ -72,7 +74,11 @@ void march(mode_data mdata) {
                     pBrightness = 0;
                 }
 
-                leds[j] = ColorFromPalette(palette, paletteValue, logscale8[pBrightness], LINEARBLEND);
+                ///////////////////////////////////////////
+                //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+                if (j >= 400 ) { leds[j+1] = ColorFromPalette(palette, paletteValue, logscale8[pBrightness], LINEARBLEND); }
+                else { leds[j] = ColorFromPalette(palette, paletteValue, logscale8[pBrightness], LINEARBLEND); }
+                
                 
                 ledIncrement += 1;
                 if (ledIncrement > selectedLedCount) { ledIncrement -= selectedLedCount; }

@@ -54,6 +54,11 @@ void dodecaImpulse(mode_data mdata) {
             
             if (edge_num > 0) {
                 led_num_start = EDGE_LENGTH * (edge_num - 1);
+                
+                ///////////////////////////////////////////
+                //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+                if (edge_num >= 20) { led_num_start++; }
+                
                 for (int i = 0; i < EDGE_LENGTH; i++) { 
                     uint16_t historyIndex = EDGE_LENGTH*edge_list_index+i;
                     float pBrightness = dodecaHistory[historyIndex] * (1 - tickImpulseDodecaPercentage) + dodecaHistory[historyIndex+1] * tickImpulseDodecaPercentage;
@@ -61,6 +66,11 @@ void dodecaImpulse(mode_data mdata) {
                 }
             } else if (edge_num < 0) {
                 led_num_start = EDGE_LENGTH * (0 - edge_num) - 1;
+
+                ///////////////////////////////////////////
+                //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
+                if (edge_num <= -20) { led_num_start++; }
+            
                 for (int i = 0; i < EDGE_LENGTH; i++) { 
                     uint16_t historyIndex = EDGE_LENGTH*edge_list_index+i;
                     float pBrightness = dodecaHistory[historyIndex] * (1 - tickImpulseDodecaPercentage) + dodecaHistory[historyIndex+1] * tickImpulseDodecaPercentage;

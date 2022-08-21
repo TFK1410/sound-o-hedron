@@ -33,5 +33,5 @@ struct midi_flash_history {
     unsigned long s;
     unsigned long e;
     bool ended;
-    int8_t edges[3*8+1];
+    int8_t edges[3*8];
 };
