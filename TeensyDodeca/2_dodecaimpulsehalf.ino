@@ -61,11 +61,6 @@ void dodecaImpulseHalf(mode_data mdata) {
                 }
             } else if (edge_num < 0) {
                 led_num_start = EDGE_LENGTH * (0 - edge_num) - 1;
-
-                ///////////////////////////////////////////
-                //Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
-                if (edge_num <= -20) { led_num_start++; }
-                
                 for (int i = 0; i < EDGE_LENGTH; i++) { 
                     uint16_t historyIndex = abs(EDGE_LENGTH*edge_list_index+i - 5*EDGE_LENGTH/2);
                     float pBrightness = dodecaHalfHistory[historyIndex] * (1 - tickImpulseDodecaHalfPercentage) + dodecaHalfHistory[historyIndex+1] * tickImpulseDodecaHalfPercentage;

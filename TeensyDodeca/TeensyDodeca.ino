@@ -17,9 +17,7 @@
 #define NUM_LEDS_PER_STRIP 200
 #define NUM_STRIPS         3
 
-////////////////////////////////////////////
-//Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup hence the + 1
-#define NUM_LEDS NUM_LEDS_PER_STRIP * NUM_STRIPS + 1
+#define NUM_LEDS NUM_LEDS_PER_STRIP * NUM_STRIPS
 #define NUM_EDGES 30
 #define FACES_COUNT 12
 
@@ -54,8 +52,9 @@ uint8_t dmx_params[5];
 mode_data mdatatest;
 #endif
 
-//Skipping broken 400 which doesn't exist (because I wired the data lines at the beggining of 2x edges to the backup
-CRGBArray<NUM_LEDS> leds;
+////////////////////////////////////////////
+//Skipping broken 400 which doesn't exist (because I wired the data lines at the begining of 2x edges to the backup hence the + 1
+CRGBArray<NUM_LEDS+1> leds;
 
 CRGBPalette16 currentPalette;
 TBlendType    currentBlending;
@@ -164,7 +163,12 @@ void loop()
             break;
         }
 #endif
+
         
+        ////////////////////////////////////////////
+        //Skipping broken 400 which doesn't exist (because I wired the data lines at the begining of 2x edges to the backup hence the shift of the leds + 1
+        memmove( &leds[2*NUM_LEDS_PER_STRIP + 1], &leds[2*NUM_LEDS_PER_STRIP], NUM_LEDS_PER_STRIP*sizeof(CRGB));
+
         FastLED.show();
         
 #ifdef TIME_DEBUG
