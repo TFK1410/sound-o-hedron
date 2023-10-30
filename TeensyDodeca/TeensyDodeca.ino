@@ -54,7 +54,9 @@ mode_data mdatatest;
 
 ////////////////////////////////////////////
 //Skipping broken 400 which doesn't exist (because I wired the data lines at the begining of 2x edges to the backup hence the + 1
-CRGBArray<NUM_LEDS+1> leds;
+// CRGBArray<NUM_LEDS+1> leds;
+//FIXED NOW
+CRGBArray<NUM_LEDS> leds;
 
 CRGBPalette16 currentPalette;
 TBlendType    currentBlending;
@@ -167,7 +169,8 @@ void loop()
         
         ////////////////////////////////////////////
         //Skipping broken 400 which doesn't exist (because I wired the data lines at the begining of 2x edges to the backup hence the shift of the leds + 1
-        memmove( &leds[2*NUM_LEDS_PER_STRIP + 1], &leds[2*NUM_LEDS_PER_STRIP], NUM_LEDS_PER_STRIP*sizeof(CRGB));
+        // memmove( &leds[2*NUM_LEDS_PER_STRIP + 1], &leds[2*NUM_LEDS_PER_STRIP], NUM_LEDS_PER_STRIP*sizeof(CRGB));
+        //FIXED NOW
 
         FastLED.show();
         

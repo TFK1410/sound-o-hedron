@@ -54,8 +54,9 @@ void initMidi() {
   for (uint8_t y = 0; y < 8; y++) {
       pad_target[y][8] = CRGB(0x3f,0x3f,0x3f);
   }
-  for (uint8_t i = 0; i < 8; i++) {
+  for (uint8_t i = 0; i < 4; i++) {
       pads_speed_face[i] = CRGB::White;
+      pads_speed_face_target[i] = CRGB::White;
   }
   launchpad_light_update_controls();
   launchpad_last_update = 0;
@@ -771,7 +772,7 @@ void midiRandomEdgeFlashHistory(uint8_t x, uint8_t y) {
         midiShuffle(3*NUM_EDGES);
         
         midi_flash_history tmp;
-        memset(&tmp.edges, 0, NUM_EDGES);
+        memset(&tmp.edges, 0, 3*8);
         uint8_t firstEdgeIndex = random8(NUM_EDGES-nEdge);
         
         for (int i = 0; i < nEdge; i++) {
