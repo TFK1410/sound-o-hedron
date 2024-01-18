@@ -20,16 +20,22 @@
 
 // Channel 0 is GPIO26
 #define CAPTURE_CHANNEL 0
-#define NUM_CHANNELS 2
-#define CAPTURE_DEPTH 1500
+#define NUM_CHANNELS 2 // must be a power of 2
+#define CAPTURE_DEPTH 4096 // must be a power of 2
+#define BUF_SIZE NUM_CHANNELS * CAPTURE_DEPTH
+
+#define DMA_CHANNELS 4 // must be a power of 2
+#define RING_SIZE 11 // log2(BUF_SIZE / DMA_CHANNELS)
+#define DMA_BUF_SIZE BUF_SIZE / DMA_CHANNELS
+
 #define SAMPLE_RATE 44100
 #define ADC_CLOCK_RATE 48000000
 
 #define FFT_RATE 40 // per sec
 #define FFT_INTERVAL_US 1000000 / FFT_RATE
-#define FFT_SMOOTH_RATE 60 // per sec
-#define FFT_SMOOTH_INTERVAL_US 1000000 / FFT_SMOOTH_RATE
-#define FFT_SMOOTH_CURVE 0.05
+// #define FFT_SMOOTH_RATE 60 // per sec
+// #define FFT_SMOOTH_INTERVAL_US 1000000 / FFT_SMOOTH_RATE
+// #define FFT_SMOOTH_CURVE 0.05
 
 #define FREQ_MIN 45
 #define FREQ_MAX 20000
@@ -44,16 +50,15 @@
 #define MODE_PIN 16 // pin 21
 bool dmxModeOn = false;
 
-uint8_t captureBuf[CAPTURE_DEPTH * NUM_CHANNELS];
-uint8_t lbuf[CAPTURE_DEPTH];
-uint8_t rbuf[CAPTURE_DEPTH];
+uint8_t captureBuf[BUF_SIZE] __attribute__ ((aligned(2048)));
+uint8_t lbuf[CAPTURE_DEPTH], rbuf[CAPTURE_DEPTH];
 uint8_t fftbuf[NUM_CHANNELS*FFT_OUTPUT];
-float fftbufSmoothFloat[NUM_CHANNELS*FFT_OUTPUT];
-uint8_t fftbufSmooth[NUM_CHANNELS*FFT_OUTPUT];
+// float fftbufSmoothFloat[NUM_CHANNELS*FFT_OUTPUT];
+// uint8_t fftbufSmooth[NUM_CHANNELS*FFT_OUTPUT];
 
-uint dmaChan;
-dma_channel_config cfg;
-absolute_time_t lastFFTUpdate, lastFFTSmoothUpdate;
+uint dmaAudioChan[DMA_CHANNELS];
+dma_channel_config cfg[DMA_CHANNELS];
+absolute_time_t lastFFTUpdate;//, lastFFTSmoothUpdate;
 
 DmxInput myDmxInput;
 volatile uint8_t dmxBuffer[DMXINPUT_BUFFER_SIZE(DMX_START_CHANNEL, DMX_COUNT_CHANNEL+1)];
@@ -67,13 +72,11 @@ static const uint I2C_SLAVE_SCL_PIN = PICO_DEFAULT_I2C_SCL_PIN; // 5
 
 void setup_gpio();
 void setup_adc();
-void setup_dma();
-void sample();
-void split_channels();
 void setup_i2c();
 void setup_dmx();
 
-void audio_fft_core();
+void split_channels(uint8_t *buf);
+void fft_calc(kiss_fft_scalar *fft_in, float *fft_out_scal, kiss_fftr_cfg *cfg, uint8_t *buf);
 
 int main() {
 
@@ -83,56 +86,130 @@ int main() {
 
     setup_adc();
 
-    setup_dma();
+    setup_i2c();
 
     setup_dmx();
 
-    multicore_launch_core1(audio_fft_core);
+    // printf("Arming DMA\n");
+    for (int i = 0; i < DMA_CHANNELS; i++) {
+        dmaAudioChan[i] = dma_claim_unused_channel(true);
+    }
 
-    // smoothing FFT loop
+    for (int i = 0; i < DMA_CHANNELS; i++) {
+        // Set up the DMA channels that split the capture buffer per channel and chain together
+        cfg[i] = dma_channel_get_default_config(dmaAudioChan[i]);
+
+        // Reading from constant address, writing to incrementing byte addresses
+        channel_config_set_transfer_data_size(&cfg[i], DMA_SIZE_8);
+        channel_config_set_read_increment(&cfg[i], false);
+        channel_config_set_write_increment(&cfg[i], true);
+        // Pace transfers based on availability of ADC samples
+        channel_config_set_dreq(&cfg[i], DREQ_ADC);
+
+        dma_channel_configure(dmaAudioChan[i], &cfg[i],
+            &captureBuf[i*DMA_BUF_SIZE],    // dst
+            &adc_hw->fifo,  // src
+            CAPTURE_DEPTH,  // transfer count
+            false            // start immediately
+        );
+
+        channel_config_set_ring(&cfg[i], true, RING_SIZE);
+
+        if (i == DMA_CHANNELS - 1) {
+            channel_config_set_chain_to(&cfg[i], dmaAudioChan[0]);
+        } else {
+            channel_config_set_chain_to(&cfg[i], dmaAudioChan[i+1]);
+        }
+
+    }
+
+    // Set starting ADC channel 
+    adc_select_input(CAPTURE_CHANNEL);
+
+    dma_start_channel_mask(1u << dmaAudioChan[0]);
+
+    adc_run(true);
+
+    // calculating actual FFT loop
+    kiss_fft_scalar fft_in[CAPTURE_DEPTH]; // kiss_fft_scalar is a float
+    float fft_out_scal[CAPTURE_DEPTH / 2];
+    kiss_fftr_cfg kisscfg = kiss_fftr_alloc(CAPTURE_DEPTH,false,0,0);
+
+    int intbins[FFT_OUTPUT+1];
+    float floatbins[FFT_OUTPUT+1];
+    calculateBins(FREQ_MIN, FREQ_MAX, FFT_OUTPUT, SAMPLE_RATE, CAPTURE_DEPTH, intbins, floatbins);
+
+    uint8_t fftframe[BUF_SIZE];
+    // FFT loop
     while (true) {
-        // if (gpio_get(MODE_PIN)) {
-        //     if (!dmxModeOn) {
-        //         // Turn on DMX
-        //         myDmxInput.begin(DMX_PIN, DMX_START_CHANNEL, DMX_COUNT_CHANNEL);
-        //         myDmxInput.read_async(dmxBuffer);
-        //         dmxModeOn = true;
-        //     }
-        //     sleep(100);
-        // } else if (!gpio_get(MODE_PIN)) {
-        //     if (dmxModeOn) {
-        //         // Turn off DMX
-        //         myDmxInput.end();
-        //         dmxModeOn = false;
-        //     }
-        // }
         if (gpio_get(MODE_PIN)) {
-            // DMX MODE - this core sleeps
+            // DMX MODE - core sleeps
             sleep_ms(1000);
         } else if (!gpio_get(MODE_PIN)) {
-            // AUDIO MODE - this core smooths fft results
-            lastFFTSmoothUpdate = get_absolute_time();
+            // AUDIO MODE - core calculates fft
+            lastFFTUpdate = get_absolute_time();
 
+            // print precalculated bin border values
+            // for (int i = 0; i <= FFT_OUTPUT; ++i) {
+            //     printf("%.3f,", intbins[i]);
+            // }
+            // printf("\n");
+            // for (int i = 0; i <= FFT_OUTPUT; ++i) {
+            //     printf("%.3f,", floatbins[i]);
+            // }
+            // printf("\n");
 
-            for (int i = 0; i < NUM_CHANNELS * FFT_OUTPUT; i++) {
-                fftbufSmoothFloat[i] = FFT_SMOOTH_CURVE*fftbufSmoothFloat[i] + (1-FFT_SMOOTH_CURVE)*fftbuf[i];
-                fftbufSmooth[i] = (uint8_t)fftbufSmoothFloat[i];
+            // get the current active dma and it's transfer count
+            int cur_buf, trans_count;
+            for (cur_buf = 0; cur_buf < DMA_CHANNELS; cur_buf++) {
+                if (dma_channel_is_busy(dmaAudioChan[cur_buf])) {
+                    trans_count = dma_channel_hw_addr(dmaAudioChan[cur_buf])->transfer_count;
+                    break;
+                }
             }
+            int border_sample = cur_buf * DMA_BUF_SIZE + trans_count;
+
+            // get the correct frame for analysis
+            memcpy(&fftframe[0], &captureBuf[border_sample], BUF_SIZE - border_sample);
+            memcpy(&fftframe[BUF_SIZE - border_sample], &captureBuf[0], border_sample);
+
+            split_channels(fftframe);
 
             // Print samples to stdout so you can display them in pyplot, excel, matlab
-            for (int i = 0; i < NUM_CHANNELS * FFT_OUTPUT; ++i) {
-                printf("%5.1f,", fftbufSmoothFloat[i]);
-            }
-            printf("\n");
-            
-            int64_t fftSmoothTime = absolute_time_diff_us(lastFFTSmoothUpdate, get_absolute_time());
-            int64_t sleepTime = FFT_SMOOTH_INTERVAL_US - fftSmoothTime;
+            // for (int i = 0; i < CAPTURE_DEPTH; ++i) {
+            //     printf("%-3d,", rbuf[i]);
+            //     if (i % 40 == 39)
+            //         printf("\n");
+            // }
+
+            fft_calc(fft_in, fft_out_scal, &kisscfg, lbuf);
+
+            fftToBins(intbins, floatbins, fft_out_scal, &fftbuf[0], FFT_OUTPUT);
+
+            fft_calc(fft_in, fft_out_scal, &kisscfg, rbuf);
+
+            fftToBins(intbins, floatbins, fft_out_scal, &fftbuf[FFT_OUTPUT], FFT_OUTPUT);
+
+            // Print fft results to stdout
+            // for (int i = 0; i < NUM_CHANNELS*FFT_OUTPUT; ++i) {
+            //     printf("%d,", fftbuf[i]);
+            // }
+            // printf("\n");
+
+            int64_t fftTime = absolute_time_diff_us(lastFFTUpdate, get_absolute_time());
+            int64_t sleepTime = FFT_INTERVAL_US - fftTime;
+            // printf("%d\n", sleepTime);
             if (sleepTime > 0) {
                 sleep_us((uint64_t)sleepTime);
             }
         }
 
     }
+
+    // Once DMA finishes, stop any new conversions from starting, and clean up
+    // the FIFO in case the ADC was still mid-conversion.
+    adc_run(false);
+    adc_fifo_drain();
 }
 
 void fft_calc(kiss_fft_scalar *fft_in, float *fft_out_scal, kiss_fftr_cfg *cfg, uint8_t *buf) {
@@ -150,59 +227,6 @@ void fft_calc(kiss_fft_scalar *fft_in, float *fft_out_scal, kiss_fftr_cfg *cfg, 
     // any frequency bin over NSAMP/2 is aliased (nyquist sampling theorum)
     for (int i = 0; i < CAPTURE_DEPTH/2; i++) {
         fft_out_scal[i] = fft_out[i].r*fft_out[i].r+fft_out[i].i*fft_out[i].i;
-    }
-}
-
-void audio_fft_core() {
-    // calculating actual FFT loop
-    kiss_fft_scalar fft_in[CAPTURE_DEPTH]; // kiss_fft_scalar is a float
-    float fft_out_scal[CAPTURE_DEPTH / 2];
-    kiss_fftr_cfg cfg = kiss_fftr_alloc(CAPTURE_DEPTH,false,0,0);
-
-    int intbins[FFT_OUTPUT+1];
-    float floatbins[FFT_OUTPUT+1];
-    calculateBins(FREQ_MIN, FREQ_MAX, FFT_OUTPUT, SAMPLE_RATE, CAPTURE_DEPTH, intbins, floatbins);
-
-    while (true) {
-        lastFFTUpdate = get_absolute_time();
-
-        // print precalculated bin border values
-        // for (int i = 0; i <= FFT_OUTPUT; ++i) {
-        //     printf("%.3f,", floatbins[i]);
-        // }
-        // printf("\n");
-
-        sample();
-
-        split_channels();
-
-        // Print samples to stdout so you can display them in pyplot, excel, matlab
-        // for (int i = 0; i < CAPTURE_DEPTH; ++i) {
-        //     printf("%-3d,", rbuf[i]);
-        //     if (i % 40 == 39)
-        //         printf("\n");
-        // }
-
-        fft_calc(fft_in, fft_out_scal, &cfg, lbuf);
-
-        fftToBins(intbins, floatbins, fft_out_scal, &fftbuf[0], FFT_OUTPUT);
-
-        fft_calc(fft_in, fft_out_scal, &cfg, rbuf);
-
-        fftToBins(intbins, floatbins, fft_out_scal, &fftbuf[FFT_OUTPUT], FFT_OUTPUT);
-
-        // Print fft results to stdout
-        // for (int i = 0; i < NUM_CHANNELS*FFT_OUTPUT; ++i) {
-        //     printf("%d,", fftbuf[i]);
-        // }
-        // printf("\n");
-
-        int64_t fftTime = absolute_time_diff_us(lastFFTUpdate, get_absolute_time());
-        int64_t sleepTime = FFT_INTERVAL_US - fftTime;
-        // printf("%d\n", sleepTime);
-        if (sleepTime > 0) {
-            sleep_us((uint64_t)sleepTime);
-        }
     }
 }
 
@@ -242,49 +266,9 @@ void setup_adc(){
     adc_set_clkdiv(ADC_CLOCK_RATE / SAMPLE_RATE / NUM_CHANNELS);
 }
 
-void setup_dma() {
-    // printf("Arming DMA\n");
-    sleep_ms(1000);
-    // Set up the DMA to start transferring data as soon as it appears in FIFO
-    dmaChan = dma_claim_unused_channel(true);
-    cfg = dma_channel_get_default_config(dmaChan);
-
-    // Reading from constant address, writing to incrementing byte addresses
-    channel_config_set_transfer_data_size(&cfg, DMA_SIZE_8);
-    channel_config_set_read_increment(&cfg, false);
-    channel_config_set_write_increment(&cfg, true);
-
-    // Pace transfers based on availability of ADC samples
-    channel_config_set_dreq(&cfg, DREQ_ADC);
-}
-
-void sample() {
-    // Set starting ADC channel 
-    adc_select_input(CAPTURE_CHANNEL);
-
-    dma_channel_configure(dmaChan, &cfg,
-        captureBuf,    // dst
-        &adc_hw->fifo,  // src
-        CAPTURE_DEPTH,  // transfer count
-        true            // start immediately
-    );
-
-    // printf("Starting capture\n");
-
-    adc_run(true);
-    dma_channel_wait_for_finish_blocking(dmaChan);
-
-    // printf("Capture finished\n");
-
-    // Once DMA finishes, stop any new conversions from starting, and clean up
-    // the FIFO in case the ADC was still mid-conversion.
-    adc_run(false);
-    adc_fifo_drain();
-}
-
-void split_channels() {
+void split_channels(uint8_t *buf) {
     // printf("Splitting channels\n");
-    for(uint16_t i=0;i<CAPTURE_DEPTH*NUM_CHANNELS;i++){
+    for(uint16_t i=0;i<BUF_SIZE;i++){
         if (i%2==0) {rbuf[i/2] = captureBuf[i];}
         else {lbuf[i/2+1] = captureBuf[i];}
     }
@@ -314,7 +298,7 @@ static void i2c_slave_handler(i2c_inst_t *i2c, i2c_slave_event_t event) {
             }
             i2c_write_raw_blocking(i2c, dmxs, DMX_COUNT_CHANNEL + 1);
         } else {
-            i2c_write_raw_blocking(i2c, fftbufSmooth, FFT_OUTPUT*NUM_CHANNELS);
+            i2c_write_raw_blocking(i2c, fftbuf, FFT_OUTPUT*NUM_CHANNELS);
         }
         break;
     case I2C_SLAVE_FINISH: // master has signalled Stop / Restart
