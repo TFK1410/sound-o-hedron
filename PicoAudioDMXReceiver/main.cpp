@@ -33,9 +33,6 @@
 
 #define FFT_RATE 40 // per sec
 #define FFT_INTERVAL_US 1000000 / FFT_RATE
-// #define FFT_SMOOTH_RATE 60 // per sec
-// #define FFT_SMOOTH_INTERVAL_US 1000000 / FFT_SMOOTH_RATE
-// #define FFT_SMOOTH_CURVE 0.05
 
 #define FREQ_MIN 45
 #define FREQ_MAX 20000
@@ -48,17 +45,14 @@
 // Switching between the audio and DMX mode is handled via a single GPIO pin where the Teensy is the writer and Pico is the reader
 // LOW - Audio mode; HIGH - DMX mode
 #define MODE_PIN 16 // pin 21
-bool dmxModeOn = false;
 
 uint8_t captureBuf[BUF_SIZE] __attribute__ ((aligned(2048)));
 uint8_t lbuf[CAPTURE_DEPTH], rbuf[CAPTURE_DEPTH];
 uint8_t fftbuf[NUM_CHANNELS*FFT_OUTPUT];
-// float fftbufSmoothFloat[NUM_CHANNELS*FFT_OUTPUT];
-// uint8_t fftbufSmooth[NUM_CHANNELS*FFT_OUTPUT];
 
 uint dmaAudioChan[DMA_CHANNELS];
 dma_channel_config cfg[DMA_CHANNELS];
-absolute_time_t lastFFTUpdate;//, lastFFTSmoothUpdate;
+absolute_time_t lastFFTUpdate;
 
 DmxInput myDmxInput;
 volatile uint8_t dmxBuffer[DMXINPUT_BUFFER_SIZE(DMX_START_CHANNEL, DMX_COUNT_CHANNEL+1)];
