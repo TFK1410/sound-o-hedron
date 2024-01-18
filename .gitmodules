@@ -1,0 +1,3 @@
+[submodule "PicoAudioDMXReceiver/Pico-DMX"]
+	path = PicoAudioDMXReceiver/Pico-DMX
+	url = https://github.com/jostlowe/Pico-DMX
