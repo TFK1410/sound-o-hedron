@@ -7,6 +7,7 @@
 #include <hardware/dma.h>
 #include <hardware/gpio.h>
 #include <hardware/i2c.h>
+// #include "tusb.h"
 
 #include "DmxInput.h"
 #include "kiss_fftr.h"
@@ -40,7 +41,7 @@
 // LOW - Audio mode; HIGH - DMX mode
 #define MODE_PIN 16 // pin 21
 
-uint8_t captureBuf[BUF_SIZE] __attribute__ ((aligned(2048)));
+uint8_t captureBuf[BUF_SIZE] __attribute__ ((aligned(4096)));
 uint8_t lbuf[CAPTURE_DEPTH], rbuf[CAPTURE_DEPTH];
 uint8_t fftbuf[NUM_CHANNELS*FFT_OUTPUT];
 
@@ -49,7 +50,7 @@ dma_channel_config cfg[DMA_CHANNELS];
 absolute_time_t lastFFTUpdate;
 
 DmxInput myDmxInput;
-volatile uint8_t dmxBuffer[DMXINPUT_BUFFER_SIZE(DMX_START_CHANNEL, DMX_COUNT_CHANNEL+1)];
+volatile uint8_t dmxBuffer[DMXINPUT_BUFFER_SIZE(DMX_START_CHANNEL, DMX_COUNT_CHANNEL)];
 unsigned long dmxLastUpdate = 0;
 uint8_t dmxs[DMX_COUNT_CHANNEL + 1];
 
@@ -69,14 +70,20 @@ void fft_calc(kiss_fft_scalar *fft_in, float *fft_out_scal, kiss_fftr_cfg *cfg, 
 int main() {
 
     stdio_init_all();
+    sleep_ms(1000);
+
+    // printf("waiting for usb host");
+    // while (!tud_cdc_connected()) {
+    //     printf(".");
+    //     sleep_ms(1000);
+    // }
+    // printf("\nusb host detected!\n");
 
     setup_gpio();
 
     setup_adc();
 
-    setup_i2c();
-
-    setup_dmx();
+    multicore_launch_core1(setup_i2c);
 
     // printf("Arming DMA\n");
     for (int i = 0; i < DMA_CHANNELS; i++) {
@@ -94,13 +101,6 @@ int main() {
         // Pace transfers based on availability of ADC samples
         channel_config_set_dreq(&cfg[i], DREQ_ADC);
 
-        dma_channel_configure(dmaAudioChan[i], &cfg[i],
-            &captureBuf[i*DMA_BUF_SIZE],    // dst
-            &adc_hw->fifo,  // src
-            CAPTURE_DEPTH,  // transfer count
-            false            // start immediately
-        );
-
         channel_config_set_ring(&cfg[i], true, RING_SIZE);
 
         if (i == DMA_CHANNELS - 1) {
@@ -109,12 +109,18 @@ int main() {
             channel_config_set_chain_to(&cfg[i], dmaAudioChan[i+1]);
         }
 
+        dma_channel_configure(dmaAudioChan[i], &cfg[i],
+            &captureBuf[i*DMA_BUF_SIZE],    // dst
+            &adc_hw->fifo,  // src
+            DMA_BUF_SIZE,   // transfer count
+            false           // start immediately
+        );
     }
 
     // Set starting ADC channel 
     adc_select_input(CAPTURE_CHANNEL);
 
-    dma_start_channel_mask(1u << dmaAudioChan[0]);
+    dma_channel_start(dmaAudioChan[0]);
 
     adc_run(true);
 
@@ -128,69 +134,68 @@ int main() {
     calculateBins(FREQ_MIN, FREQ_MAX, FFT_OUTPUT, SAMPLE_RATE, CAPTURE_DEPTH, intbins, floatbins);
 
     uint8_t fftframe[BUF_SIZE];
-    // FFT loop
+    
+    // AUDIO MODE - core calculates fft
     while (true) {
-        if (gpio_get(MODE_PIN)) {
-            // DMX MODE - core sleeps
-            sleep_ms(1000);
-        } else if (!gpio_get(MODE_PIN)) {
-            // AUDIO MODE - core calculates fft
-            lastFFTUpdate = get_absolute_time();
+        lastFFTUpdate = get_absolute_time();
 
-            // print precalculated bin border values
-            // for (int i = 0; i <= FFT_OUTPUT; ++i) {
-            //     printf("%.3f,", intbins[i]);
-            // }
-            // printf("\n");
-            // for (int i = 0; i <= FFT_OUTPUT; ++i) {
-            //     printf("%.3f,", floatbins[i]);
-            // }
-            // printf("\n");
+        // print precalculated bin border values
+        // for (int i = 0; i <= FFT_OUTPUT; ++i) {
+        //     printf("%.3f,", intbins[i]);
+        // }
+        // printf("\n");
+        // for (int i = 0; i <= FFT_OUTPUT; ++i) {
+        //     printf("%.3f,", floatbins[i]);
+        // }
+        // printf("\n");
 
-            // get the current active dma and it's transfer count
-            int cur_buf, trans_count;
-            for (cur_buf = 0; cur_buf < DMA_CHANNELS; cur_buf++) {
-                if (dma_channel_is_busy(dmaAudioChan[cur_buf])) {
-                    trans_count = dma_channel_hw_addr(dmaAudioChan[cur_buf])->transfer_count;
-                    break;
-                }
-            }
-            int border_sample = cur_buf * DMA_BUF_SIZE + trans_count;
-
-            // get the correct frame for analysis
-            memcpy(&fftframe[0], &captureBuf[border_sample], BUF_SIZE - border_sample);
-            memcpy(&fftframe[BUF_SIZE - border_sample], &captureBuf[0], border_sample);
-
-            split_channels(fftframe);
-
-            // Print samples to stdout so you can display them in pyplot, excel, matlab
-            // for (int i = 0; i < CAPTURE_DEPTH; ++i) {
-            //     printf("%-3d,", rbuf[i]);
-            //     if (i % 40 == 39)
-            //         printf("\n");
-            // }
-
-            fft_calc(fft_in, fft_out_scal, &kisscfg, lbuf);
-
-            fftToBins(intbins, floatbins, fft_out_scal, &fftbuf[0], FFT_OUTPUT);
-
-            fft_calc(fft_in, fft_out_scal, &kisscfg, rbuf);
-
-            fftToBins(intbins, floatbins, fft_out_scal, &fftbuf[FFT_OUTPUT], FFT_OUTPUT);
-
-            // Print fft results to stdout
-            // for (int i = 0; i < NUM_CHANNELS*FFT_OUTPUT; ++i) {
-            //     printf("%d,", fftbuf[i]);
-            // }
-            // printf("\n");
-
-            int64_t fftTime = absolute_time_diff_us(lastFFTUpdate, get_absolute_time());
-            int64_t sleepTime = FFT_INTERVAL_US - fftTime;
-            // printf("%d\n", sleepTime);
-            if (sleepTime > 0) {
-                sleep_us((uint64_t)sleepTime);
+        // get the current active dma and it's transfer count
+        int cur_buf=0, trans_count=0;
+        for (cur_buf = 0; cur_buf < DMA_CHANNELS; cur_buf++) {
+            printf("%d, %#010x, ASD\n",dmaAudioChan[cur_buf], dma_channel_hw_addr(dmaAudioChan[cur_buf])->ctrl_trig);
+            if (dma_channel_is_busy(dmaAudioChan[cur_buf])) {
+                trans_count = dma_channel_hw_addr(dmaAudioChan[cur_buf])->transfer_count;
+                break;
             }
         }
+        int border_sample = cur_buf * DMA_BUF_SIZE + trans_count;
+
+        // splice the correct frame for analysis
+        if (border_sample < BUF_SIZE) {
+            memcpy(&fftframe[0], &captureBuf[border_sample], BUF_SIZE - border_sample);
+        }
+        memcpy(&fftframe[BUF_SIZE - border_sample], &captureBuf[0], border_sample);
+
+        split_channels(fftframe);
+
+        // Print samples to stdout
+        // for (int i = 0; i < CAPTURE_DEPTH; ++i) {
+        //     printf("%-3d,", rbuf[i]);
+        //     if (i % 40 == 39)
+        //         printf("\n");
+        // }
+
+        fft_calc(fft_in, fft_out_scal, &kisscfg, lbuf);
+
+        fftToBins(intbins, floatbins, fft_out_scal, &fftbuf[0], FFT_OUTPUT);
+
+        fft_calc(fft_in, fft_out_scal, &kisscfg, rbuf);
+
+        fftToBins(intbins, floatbins, fft_out_scal, &fftbuf[FFT_OUTPUT], FFT_OUTPUT);
+
+        // Print fft results to stdout
+        // for (int i = 0; i < NUM_CHANNELS*FFT_OUTPUT; ++i) {
+        //     printf("%d,", fftbuf[i]);
+        // }
+        // printf("\n");
+
+        int64_t fftTime = absolute_time_diff_us(lastFFTUpdate, get_absolute_time());
+        int64_t sleepTime = FFT_INTERVAL_US - fftTime;
+        // printf("%d\n", sleepTime);
+        if (sleepTime > 0) {
+            sleep_us((uint64_t)sleepTime);
+        }
+        // }
 
     }
 
@@ -306,6 +311,12 @@ void setup_i2c() {
     gpio_pull_up(I2C_SLAVE_SCL_PIN);
 
     i2c_init(i2c0, I2C_BAUDRATE);
-    // configure I2C0 for slave mode
+    // configure I2C0 for slave mode we start it on core1 so that this is the one responding to I2C requests
     i2c_slave_init(i2c0, I2C_SLAVE_ADDRESS, &i2c_slave_handler);
+
+    setup_dmx();
+
+    while(true){
+        sleep_ms(1000);
+    }
 }
